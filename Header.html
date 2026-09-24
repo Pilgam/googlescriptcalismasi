@@ -1,34 +1,19 @@
 <header class="app-header">
-  <a class="brand" href="#" data-page="Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
+  <a class="brand" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
   <nav>
-    <a class="button button-secondary" href="#" data-page="Index">Hızlı işlem</a>
-    <a class="button button-secondary" href="#" data-page="MasterTakip">Liste</a>
-    <a class="button button-secondary" href="#" data-page="Sertifikalar">Kalibrasyon Giriş</a>
-    <a class="button button-secondary" href="#" data-page="Raporlar">İstatistik</a>
+    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index">Hızlı işlem</a>
+    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=MasterTakip">Liste</a>
+    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Sertifikalar">Kalibrasyon Giriş</a>
+    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Raporlar">İstatistik</a>
   </nav>
   <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
 </header>
 <script>
-(function () {
-  function navigate(event) {
-    event.preventDefault();
-    var page = event.currentTarget.getAttribute('data-page');
-    var url = new URL(window.location.href);
-    url.search = '';
-    url.searchParams.set('page', page);
-    window.location.assign(url.toString());
-  }
-
-  document.querySelectorAll('[data-page]').forEach(function (link) {
-    link.addEventListener('click', navigate);
-  });
-
-  document.addEventListener('DOMContentLoaded', function () {
-    var context = window.APP_CONTEXT || {};
-    var name = document.getElementById('headerUserName');
-    var role = document.getElementById('headerUserRole');
-    if (name) name.textContent = context.name || 'Kullanıcı';
-    if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
-  });
-}());
+document.addEventListener('DOMContentLoaded', function () {
+  var context = window.APP_CONTEXT || {};
+  var name = document.getElementById('headerUserName');
+  var role = document.getElementById('headerUserRole');
+  if (name) name.textContent = context.name || 'Kullanıcı';
+  if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
+});
 </script>
