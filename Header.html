@@ -1,0 +1,13 @@
+<header class="app-header">
+  <a class="brand" href="?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
+  <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
+</header>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const context = window.APP_CONTEXT || {};
+    const name = document.getElementById('headerUserName');
+    const role = document.getElementById('headerUserRole');
+    if (name) name.textContent = context.name || 'Kullanıcı';
+    if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
+  });
+</script>

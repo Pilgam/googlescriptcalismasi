@@ -2,6 +2,7 @@
   "timeZone": "Europe/Istanbul",
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
+  "dependencies": {},
   "web": {
     "access": "ANYONE",
     "executeAs": "USER_DEPLOYING"
