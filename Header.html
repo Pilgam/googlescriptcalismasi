@@ -9,11 +9,5 @@
   <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
 </header>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  var context = window.APP_CONTEXT || {};
-  var name = document.getElementById('headerUserName');
-  var role = document.getElementById('headerUserRole');
-  if (name) name.textContent = context.name || 'Kullanıcı';
-  if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
-});
+document.addEventListener('DOMContentLoaded', function () { var c=window.APP_CONTEXT||{}; var n=document.getElementById('headerUserName'); var r=document.getElementById('headerUserRole'); if(n)n.textContent=c.name||'Kullanıcı'; if(r)r.textContent=c.role&&c.role!=='guest'?'('+c.role+')':''; });
 </script>
