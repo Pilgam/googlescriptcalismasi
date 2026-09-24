@@ -9,52 +9,47 @@
 <body>
   <?!= include('Header'); ?>
   <main class="page-shell">
-    <div class="page-toolbar">
-      <div>
-        <p class="eyebrow">LİSTE</p>
-        <h1>Mastar listesi</h1>
-      </div>
-    </div>
-
+    <div class="page-toolbar"><div><p class="eyebrow">LİSTE</p><h1>Mastar listesi</h1><p class="muted">Tüm ürünler aşağıda görünür. Arama yazdıkça liste filtrelenir.</p></div></div>
     <section class="panel">
-      <div class="search-line">
-        <input id="listSearch" placeholder="Mastar adı veya kodu yazın" autocomplete="off">
-        <label class="check-box"><input id="listIncludeAll" type="checkbox"> Pasifler dahil</label>
-        <button class="button button-primary" type="button" onclick="runListSearch()">Ara</button>
-      </div>
+      <div class="search-line"><input id="listSearch" placeholder="Mastar kodu, ürün adı, seri no veya konum" autocomplete="off"><label class="check-box"><input id="listIncludeAll" type="checkbox"> Pasifler dahil</label></div>
     </section>
-
-    <section class="panel">
-      <div id="tableResults"></div>
-    </section>
+    <section class="panel"><div id="tableResults"><p class="muted">Ürünler yükleniyor...</p></div></section>
+    <section id="detailPanel" class="panel hidden"><div id="detailContent"></div></section>
   </main>
-
   <script>window.APP_CONTEXT = <?= userContext ?>;</script>
   <script>
-    document.getElementById('listSearch').addEventListener('keydown', function (event) {
-      if (event.key === 'Enter') runListSearch();
-    });
+    let rows = [];
+    const $ = id => document.getElementById(id);
+    document.addEventListener('DOMContentLoaded', loadList);
+    $('listSearch').addEventListener('input', loadList);
+    $('listIncludeAll').addEventListener('change', loadList);
 
-    function runListSearch() {
-      const query = document.getElementById('listSearch').value.trim();
-      const includeAll = document.getElementById('listIncludeAll').checked;
-      google.script.run.withSuccessHandler(function (rows) {
-        const el = document.getElementById('tableResults');
-        if (!rows.length) {
-          el.innerHTML = '<p class="muted">Kayıt bulunamadı.</p>';
-          return;
-        }
-        el.innerHTML = '<table class="data-table"><thead><tr><th>Mastar</th><th>Ürün</th><th>Seri</th><th>Konum</th><th>Son kalibrasyon</th><th>Durum</th><th>Kimde</th></tr></thead><tbody>' + rows.map(function (row) {
-          return '<tr><td>' + safe(row.MastarNo) + '</td><td>' + safe(row.UrunAdi) + '</td><td>' + safe(row.SeriNo) + '</td><td>' + safe(row.AnaKonum) + ' / ' + safe(row.DetayKonum) + '</td><td>' + safe(row.SonKontrolTarihi || '-') + '</td><td>' + safe(row.Durum || '-') + '</td><td>' + safe(row.SorumluKisi || '-') + '</td></tr>';
-        }).join('') + '</tbody></table>';
-      }).searchProducts(query, { includeAll: includeAll });
+    function loadList() {
+      google.script.run.withSuccessHandler(renderTable).withFailureHandler(error => $('tableResults').innerHTML = '<p class="form-message error">' + safe(error.message) + '</p>').searchProducts($('listSearch').value.trim(), { includeAll: $('listIncludeAll').checked });
     }
 
-    function safe(value) {
-      return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
-        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char];
-      });
+    function renderTable(result) {
+      rows = result || [];
+      if (!rows.length) { $('tableResults').innerHTML = '<p class="muted">Kayıt bulunamadı.</p>'; return; }
+      $('tableResults').innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Mastar</th><th>Ürün</th><th>Seri</th><th>Konum</th><th>Son kalibrasyon</th><th>Durum</th><th>Kimde</th></tr></thead><tbody>' + rows.map((row, index) => '<tr class="clickable-row" data-index="' + index + '"><td>' + safe(row.MastarNo) + '</td><td>' + safe(row.UrunAdi) + '</td><td>' + safe(row.SeriNo) + '</td><td>' + safe(row.AnaKonum || 'Depo') + ' / ' + safe(row.DetayKonum || '-') + '</td><td>' + safe(row.SonKontrolTarihi || '-') + '</td><td>' + safe(row.Durum || '-') + '</td><td>' + safe(row.SorumluKisi || '-') + '</td></tr>').join('') + '</tbody></table></div>';
+      Array.from(document.querySelectorAll('.clickable-row')).forEach(row => row.addEventListener('click', () => showDetail(rows[Number(row.dataset.index)].MastarNo)));
     }
+
+    function showDetail(productNo) {
+      google.script.run.withSuccessHandler(detail => {
+        if (!detail) return;
+        $('detailPanel').classList.remove('hidden');
+        const product = detail.product;
+        const certificates = detail.certificates || [];
+        const history = detail.history || [];
+        $('detailContent').innerHTML = '<div class="section-head"><div><p class="eyebrow">ÜRÜN DETAYI</p><h2>' + safe(product.UrunAdi) + '</h2><span class="muted">' + safe(product.MastarNo) + '</span></div></div><div class="info-grid"><div class="info-box"><span>Konum</span><strong>' + safe(product.AnaKonum || 'Depo') + ' / ' + safe(product.DetayKonum || '-') + '</strong></div><div class="info-box"><span>Durum</span><strong>' + safe(product.Durum || '-') + '</strong></div><div class="info-box"><span>Kimde</span><strong>' + safe(product.SorumluKisi || '-') + '</strong></div><div class="info-box"><span>Son kalibrasyon</span><strong>' + safe(product.SonKontrolTarihi || '-') + '</strong></div></div><h3>Kalibrasyon geçmişi</h3>' + certificateTable(certificates) + '<h3 style="margin-top:24px">Hareket geçmişi</h3>' + historyTable(history);
+        $('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }).withFailureHandler(error => alert(error.message || 'Detay yüklenemedi.')).getProductDetail(productNo);
+    }
+
+    function certificateTable(items) { return items.length ? '<div class="table-wrap"><table class="data-table"><tr><th>Tarih</th><th>Tür</th><th>No</th><th>Geçerlilik</th><th>Durum</th></tr>' + items.map(row => '<tr><td>' + safe(row.SertifikaTarihi || '-') + '</td><td>' + safe(row.SertifikaTuru || '-') + '</td><td>' + safe(row.SertifikaNo || '-') + '</td><td>' + safe(row.GecerlilikTarihi || '-') + '</td><td>' + safe(row.SertifikaDurumu || '-') + '</td></tr>').join('') + '</table></div>' : '<p class="muted">Kalibrasyon kaydı yok.</p>'; }
+    function historyTable(items) { return items.length ? '<div class="table-wrap"><table class="data-table"><tr><th>Tarih</th><th>İşlem</th><th>Yapan</th><th>Eski → Yeni</th><th>Açıklama</th></tr>' + items.map(row => '<tr><td>' + safe(row.TarihSaat || '-') + '</td><td>' + safe(row.HareketTuru || '-') + '</td><td>' + safe(row.KullaniciAdi || '-') + '</td><td>' + safe(row.EskiAnaKonum || '-') + ' → ' + safe(row.YeniAnaKonum || '-') + '</td><td>' + safe(row.Aciklama || '-') + '</td></tr>').join('') + '</table></div>' : '<p class="muted">Hareket kaydı yok.</p>'; }
+    function safe(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
   </script>
 </body>
 </html>
