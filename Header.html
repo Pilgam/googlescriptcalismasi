@@ -1,13 +1,1 @@
-<header class="app-header">
-  <a class="brand" href="?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
-  <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
-</header>
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const context = window.APP_CONTEXT || {};
-    const name = document.getElementById('headerUserName');
-    const role = document.getElementById('headerUserRole');
-    if (name) name.textContent = context.name || 'Kullanıcı';
-    if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
-  });
-</script>
+<header class="app-header"><a class="brand" href="?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a><nav><a class="button button-secondary" href="?page=MasterTakip">Liste</a> <a class="button button-secondary" href="?page=Raporlar">İstatistik</a></nav><div class="user-area"><span id="headerUserName" class="user-name"></span> <span id="headerUserRole"></span></div></header><script>document.addEventListener('DOMContentLoaded',function(){const c=window.APP_CONTEXT||{};document.getElementById('headerUserName').textContent=c.name||'Kullanıcı';document.getElementById('headerUserRole').textContent=c.role&&c.role!=='guest'?'('+c.role+')':''})</script>

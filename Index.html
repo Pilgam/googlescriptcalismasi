@@ -1,32 +1,18 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <base target="_top">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <?!= include('Styles'); ?>
-  </head>
-  <body>
-    <?!= include('Header'); ?>
-    <main class="page-shell">
-      <section class="page-intro">
-        <div>
-          <p class="eyebrow">MODÜLLER</p>
-          <h1>Ana Menü</h1>
-          <p class="muted">Bu ekran, ana uygulamadan gelen kullanıcı oturumu ile entegre edilecek modül alanıdır.</p>
-        </div>
-      </section>
-      <section class="module-grid">
-        <a class="module-card module-card-primary" href="?page=MasterTakip">
-          <span class="module-icon">M</span><span><strong>Mastar Takip</strong><small>Arama, detay ve hareket kaydı</small></span>
-        </a>
-        <a class="module-card" href="?page=MasterTakip"><span class="module-icon">Ü</span><span><strong>Ürün Arama</strong><small>Mastar ve ürün bilgilerini bul</small></span></a>
-        <a class="module-card is-disabled" href="#"><span class="module-icon">H</span><span><strong>Hareketler</strong><small>Sonraki adımda eklenecek</small></span></a>
-        <a class="module-card is-disabled" href="#"><span class="module-icon">K</span><span><strong>Konumlar</strong><small>Sonraki adımda eklenecek</small></span></a>
-        <a class="module-card is-disabled" href="#"><span class="module-icon">R</span><span><strong>Raporlar</strong><small>Sonraki adımda eklenecek</small></span></a>
-        <a class="module-card is-disabled" href="#"><span class="module-icon">A</span><span><strong>Ayarlar</strong><small>Sonraki adımda eklenecek</small></span></a>
-      </section>
-    </main>
-    <script>window.APP_CONTEXT = <?= userContext ?>;</script>
-  </body>
-</html>
+<html><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><?!= include('Styles'); ?></head><body><?!= include('Header'); ?><main class="page-shell">
+<section class="hero"><div><p class="eyebrow">MASTAR YÖNETİMİ</p><h1>Hızlı işlem merkezi</h1><p class="muted">Mastarı ara, seç ve hareketi doğrudan kaydet.</p></div><div class="hero-stats"><div><strong id="statProducts">-</strong><span>görünen mastar</span></div><div><strong id="statMovements">-</strong><span>toplam hareket</span></div></div></section>
+<section class="quick-search panel"><div class="search-line"><input id="globalSearch" autofocus placeholder="Mastar adı veya kodu yazın  ·  örn: g8 tampon mastar"><label class="check"><input id="includeAll" type="checkbox"> Pasifler dahil</label><button class="button button-primary" onclick="search()">Bul</button></div><p id="searchHint" class="muted">Yazım hatalarını ve yakın ölçüleri de bulmaya çalışır.</p></section>
+<section class="panel"><div class="section-heading"><h2>Arama sonuçları</h2><span id="resultCount" class="muted"></span></div><div id="results"><p class="muted">Arama kutusuna mastar adı veya kodu yazın.</p></div></section>
+<section id="actionPanel" class="panel hidden"></section>
+</main><script>window.APP_CONTEXT=<?= userContext ?>;</script><script>
+const $=id=>document.getElementById(id); let selected=null;
+$('globalSearch').onkeydown=e=>{if(e.key==='Enter')search()};
+function search(){const query=$('globalSearch').value.trim();if(!query){$('searchHint').textContent='Bir mastar adı veya kodu yazın.';return} google.script.run.withSuccessHandler(renderResults).withFailureHandler(error=>{$('searchHint').textContent=error.message}).searchProducts(query,{includeAll:$('includeAll').checked})}
+function renderResults(rows){$('resultCount').textContent=rows.length+' sonuç';if(!rows.length){$('results').innerHTML='<p class="muted">Uygun kayıt bulunamadı. Pasifleri dahil etmeyi deneyin.</p>';return} $('results').innerHTML='<div class="result-grid">'+rows.map((p,i)=>'<button class="product-result" onclick="selectProduct('+i+')"><span class="result-code">'+safe(p.MastarNo)+'</span><strong>'+safe(p.UrunAdi)+'</strong><small>'+safe(p.SeriNo)+' · '+safe(p.AnaKonum)+' / '+safe(p.DetayKonum)+'</small><em>'+safe(p.Durum)+'</em></button>').join('')+'</div>';window.searchRows=rows}
+function selectProduct(index){selected=window.searchRows[index]; renderAction();}
+function renderAction(){const p=selected;$('actionPanel').classList.remove('hidden');$('actionPanel').innerHTML='<div class="section-heading"><div><p class="eyebrow">SEÇİLEN MASTAR</p><h2>'+safe(p.UrunAdi)+'</h2><span class="muted">'+safe(p.MastarNo)+' · '+safe(p.SeriNo)+'</span></div><span class="status-badge">'+safe(p.Durum)+'</span></div><div class="current-info"><div><span>Mevcut konum</span><strong>'+safe(p.AnaKonum)+' / '+safe(p.DetayKonum)+'</strong></div><div><span>Kimde</span><strong>'+safe(p.SorumluKisi||'Belirtilmemiş')+'</strong></div><div><span>Açıklama</span><strong>'+safe(p.Aciklama)+'</strong></div></div><div class="action-tabs"><button class="button button-primary" onclick="setAction(\'Al\')">Üzerime Al</button><button class="button button-secondary" onclick="setAction(\'Geri Koy\')">Geri Koy</button><button class="button button-secondary" onclick="setAction(\'Transfer\')">Transfer</button></div><div id="actionForm"></div><div class="history"><h3>Son hareketler</h3><div id="historyList">Yükleniyor...</div></div>';loadHistory(p.MastarNo);setAction('Al')}
+function setAction(type){$('actionForm').innerHTML='<div class="form-grid"><label class="field">İşlem<select id="movementType"><option>'+type+'</option><option>Al</option><option>Geri Koy</option><option>Transfer</option><option>Kontrol</option></select></label><label class="field">Yeni ana konum<input id="mainLocation" value="'+safeAttr(selected.AnaKonum)+'"></label><label class="field">Detay konum / kimde<input id="detailLocation" value="'+safeAttr(selected.DetayKonum)+'" placeholder="Kişi, dolap, raf..."></label><label class="field">Neden / açıklama<input id="reason" placeholder="Kullanım amacı veya iade nedeni"></label></div><button class="button button-primary" onclick="save()">İşlemi kaydet</button><p id="actionMessage" class="form-message"></p>'}
+function save(){google.script.run.withSuccessHandler(()=>{show('Kaydedildi.','success');search()}).withFailureHandler(e=>show(e.message,'error')).saveMovement({mastarNo:selected.MastarNo,movementType:$('movementType').value,newMainLocation:$('mainLocation').value,newDetailLocation:$('detailLocation').value,newStatus:selected.Durum,description:$('reason').value,userEmail:window.APP_CONTEXT.email,userName:window.APP_CONTEXT.name,source:'HizliIslem'})}
+function loadHistory(no){google.script.run.withSuccessHandler(rows=>{$('historyList').innerHTML=rows.length?'<table class="data-table"><tr><th>Tarih</th><th>İşlem</th><th>Kullanıcı</th><th>Eski → Yeni</th><th>Neden</th></tr>'+rows.slice(0,8).map(r=>'<tr><td>'+safe(r.TarihSaat)+'</td><td>'+safe(r.HareketTuru)+'</td><td>'+safe(r.KullaniciAdi)+'</td><td>'+safe(r.EskiAnaKonum)+' → '+safe(r.YeniAnaKonum)+'</td><td>'+safe(r.Aciklama)+'</td></tr>').join('')+'</table>':'<p class="muted">Hareket yok.</p>'}).getMovementHistory(no)}
+function show(text,type){$('actionMessage').textContent=text;$('actionMessage').className='form-message '+type} function safe(v){return String(v==null?'':v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))} function safeAttr(v){return safe(v).replace(/\n/g,' ')}
+</script></body></html>
