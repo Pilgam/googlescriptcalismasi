@@ -1,2 +1,74 @@
 <!DOCTYPE html>
-<html><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><?!= include('Styles'); ?></head><body><?!= include('Header'); ?><main class="page-shell"><div class="page-toolbar"><div><p class="eyebrow">ANALİZ</p><h1>İstatistikler</h1></div><a class="button button-secondary" href="?page=Index">Hızlı işlem</a></div><section class="stat-grid"><div class="stat-card"><strong id="total">-</strong><span>toplam hareket</span></div><div class="stat-card"><strong id="locations">-</strong><span>aktif konum</span></div><div class="stat-card"><strong id="users">-</strong><span>işlem yapan kişi</span></div></section><section class="panel"><h2>Nerede daha çok kullanılmış?</h2><div id="byLocation"></div></section><section class="panel"><h2>Kim, hangi mastarı daha çok kullanmış?</h2><div id="byUser"></div></section><section class="panel"><h2>Hangi mastar daha çok hareket görmüş?</h2><div id="byProduct"></div></section></main><script>window.APP_CONTEXT=<?= userContext ?>;</script><script>google.script.run.withSuccessHandler(render).getAnalytics();function render(data){document.getElementById('total').textContent=data.totalMovements;document.getElementById('locations').textContent=Object.keys(data.byLocation).length;document.getElementById('users').textContent=Object.keys(data.byUser).length;draw('byLocation',data.byLocation);draw('byUser',data.byUser);draw('byProduct',data.byProduct)}function draw(id,obj){const rows=Object.entries(obj).sort((a,b)=>b[1]-a[1]);document.getElementById(id).innerHTML='<table class="data-table"><tr><th>Değer</th><th>Adet</th><th>Dağılım</th></tr>'+rows.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td><div class="bar"><i style="width:'+Math.min(100,r[1]*12)+'%"></i></div></td></tr>').join('')+'</table>'}</script></body></html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <?!= include('Header'); ?>
+  <main class="page-shell">
+    <div class="page-toolbar">
+      <div>
+        <p class="eyebrow">ANALİZ</p>
+        <h1>İstatistikler</h1>
+      </div>
+      <a class="button button-secondary" href="?page=Index">Hızlı işlem</a>
+    </div>
+
+    <section class="stat-grid">
+      <div class="stat-card"><strong id="totalMovements">-</strong><span>toplam hareket</span></div>
+      <div class="stat-card"><strong id="distinctLocations">-</strong><span>konum sayısı</span></div>
+      <div class="stat-card"><strong id="distinctUsers">-</strong><span>işlem yapan kişi</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Nerede daha çok kullanılmış?</h2>
+      <div id="byLocation"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Kim daha çok işlem yapmış?</h2>
+      <div id="byUser"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Hangi mastar daha çok hareket görmüş?</h2>
+      <div id="byProduct"></div>
+    </section>
+  </main>
+
+  <script>window.APP_CONTEXT = <?= userContext ?>;</script>
+  <script>
+    google.script.run.withSuccessHandler(function (data) {
+      document.getElementById('totalMovements').textContent = data.totalMovements;
+      document.getElementById('distinctLocations').textContent = Object.keys(data.byLocation || {}).length;
+      document.getElementById('distinctUsers').textContent = Object.keys(data.byUser || {}).length;
+      renderBarChart('byLocation', data.byLocation);
+      renderBarChart('byUser', data.byUser);
+      renderBarChart('byProduct', data.byProduct);
+    }).getAnalytics();
+
+    function renderBarChart(id, object) {
+      const rows = Object.entries(object || {}).sort(function (a, b) { return b[1] - a[1]; });
+      const max = Math.max(1, ...rows.map(function (row) { return row[1]; }));
+      const el = document.getElementById(id);
+      if (!rows.length) {
+        el.innerHTML = '<p class="muted">Veri yok.</p>';
+        return;
+      }
+      el.innerHTML = '<table class="data-table"><thead><tr><th>Değer</th><th>Adet</th><th>Dağılım</th></tr></thead><tbody>' + rows.map(function (row) {
+        const width = Math.max(8, (row[1] / max) * 100);
+        return '<tr><td>' + safe(row[0]) + '</td><td>' + row[1] + '</td><td><div class="bar"><i style="width:' + width + '%"></i></div></td></tr>';
+      }).join('') + '</tbody></table>';
+    }
+
+    function safe(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,2 +1,61 @@
 <!DOCTYPE html>
-<html><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><?!= include('Styles'); ?></head><body><?!= include('Header'); ?><main class="page-shell"><div class="page-toolbar"><div><p class="eyebrow">KAYIT LİSTESİ</p><h1>Mastar Takip</h1></div><a class="button button-secondary" href="?page=Index">Hızlı işlem</a></div><section class="panel"><div class="search-line"><input id="searchInput" autofocus placeholder="Mastar adı veya kodu"><label class="check"><input id="includeAll" type="checkbox"> Pasifler dahil</label><button class="button button-primary" onclick="runSearch()">Ara</button></div></section><section class="panel"><div id="results"><p class="muted">Arama yapın.</p></div></section></main><script>window.APP_CONTEXT=<?= userContext ?>;</script><script>function runSearch(){google.script.run.withSuccessHandler(rows=>{document.getElementById('results').innerHTML='<table class="data-table"><tr><th>Mastar</th><th>Ürün</th><th>Seri</th><th>Konum</th><th>Durum</th></tr>'+rows.map(p=>'<tr><td>'+p.MastarNo+'</td><td>'+p.UrunAdi+'</td><td>'+p.SeriNo+'</td><td>'+p.AnaKonum+' / '+p.DetayKonum+'</td><td>'+p.Durum+'</td></tr>').join('')+'</table>'}).searchProducts(document.getElementById('searchInput').value,{includeAll:document.getElementById('includeAll').checked})}</script></body></html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <?!= include('Header'); ?>
+  <main class="page-shell">
+    <div class="page-toolbar">
+      <div>
+        <p class="eyebrow">LİSTE</p>
+        <h1>Mastar listesi</h1>
+      </div>
+      <a class="button button-secondary" href="?page=Index">Hızlı işlem</a>
+    </div>
+
+    <section class="panel">
+      <div class="search-line">
+        <input id="listSearch" placeholder="Mastar adı veya kodu yazın" autocomplete="off">
+        <label class="check-box"><input id="listIncludeAll" type="checkbox"> Pasifler dahil</label>
+        <button class="button button-primary" onclick="runListSearch()">Ara</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div id="tableResults"></div>
+    </section>
+  </main>
+
+  <script>window.APP_CONTEXT = <?= userContext ?>;</script>
+  <script>
+    document.getElementById('listSearch').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') runListSearch();
+    });
+
+    function runListSearch() {
+      const query = document.getElementById('listSearch').value.trim();
+      const includeAll = document.getElementById('listIncludeAll').checked;
+      google.script.run.withSuccessHandler(function (rows) {
+        const el = document.getElementById('tableResults');
+        if (!rows.length) {
+          el.innerHTML = '<p class="muted">Kayıt bulunamadı.</p>';
+          return;
+        }
+        el.innerHTML = '<table class="data-table"><thead><tr><th>Mastar</th><th>Ürün</th><th>Seri</th><th>Konum</th><th>Durum</th><th>Kimde</th></tr></thead><tbody>' + rows.map(function (row) {
+          return '<tr><td>' + safe(row.MastarNo) + '</td><td>' + safe(row.UrunAdi) + '</td><td>' + safe(row.SeriNo) + '</td><td>' + safe(row.AnaKonum) + ' / ' + safe(row.DetayKonum) + '</td><td>' + safe(row.Durum) + '</td><td>' + safe(row.SorumluKisi || '-') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+      }).searchProducts(query, { includeAll: includeAll });
+    }
+
+    function safe(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
+      });
+    }
+  </script>
+</body>
+</html>
