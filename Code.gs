@@ -19,9 +19,10 @@ const HEADERS = Object.freeze({
 
 function doGet(e) {
   ensureSheets_();
-  const requested = String(e?.parameter?.page || 'Index').toLowerCase();
+  const requested = String(e && e.parameter && e.parameter.page || 'Index').toLowerCase();
   const page = CONFIG.pages.find(name => name.toLowerCase() === requested) || 'Index';
   const template = HtmlService.createTemplateFromFile(page);
+  template.appUrl = ScriptApp.getService().getUrl() || '';
   template.userContext = JSON.stringify(getCurrentUser_(e)).replace(/</g, '\\u003c');
   return template.evaluate()
     .setTitle(CONFIG.title)
@@ -34,9 +35,7 @@ function include(fileName) {
 
 function getSpreadsheet_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  if (!spreadsheet) {
-    throw new Error('Bu Apps Script projesi bir Google E-Tablosuna bağlı olmalıdır.');
-  }
+  if (!spreadsheet) throw new Error('Bu Apps Script projesi bir Google E-Tablosuna bağlı olmalıdır.');
   return spreadsheet;
 }
 
@@ -65,7 +64,7 @@ function getRows_(sheetName) {
 }
 
 function normalize_(value) {
-  return String(value ?? '')
+  return String(value == null ? '')
     .toLocaleLowerCase('tr-TR')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -78,42 +77,15 @@ function isActive_(value) {
   return value !== false && String(value).toLowerCase() !== 'false' && String(value).toLowerCase() !== '0';
 }
 
-function parseDate_(value) {
-  if (!value) return null;
-  if (value instanceof Date && !isNaN(value.getTime())) return new Date(value);
-  const text = String(value).trim();
-  let match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-  let date;
-  if (match && text.includes('.')) {
-    date = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
-  } else if (match && text.includes('/')) {
-    date = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
-  } else {
-    date = new Date(text);
-  }
-  return isNaN(date.getTime()) ? null : date;
-}
-
-function dateKey_(value) {
-  const date = parseDate_(value);
-  if (!date) return null;
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function formatDate_(value, format) {
-  const date = parseDate_(value);
-  return date ? Utilities.formatDate(date, Session.getScriptTimeZone(), format || 'dd.MM.yyyy') : '';
-}
-
 function getCurrentUser_(event) {
   const sessionEmail = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
-  const parameterEmail = String(event?.parameter?.userEmail || '').trim().toLowerCase();
+  const parameterEmail = String(event && event.parameter && event.parameter.userEmail || '').trim().toLowerCase();
   const email = sessionEmail || parameterEmail;
   const user = getRows_(CONFIG.sheets.users).find(row => String(row.Email || '').trim().toLowerCase() === email);
   return {
-    name: user?.KullaniciAdi || String(event?.parameter?.userName || 'Kullanıcı'),
-    email,
-    role: user?.Rol || 'guest',
+    name: user && user.KullaniciAdi || String(event && event.parameter && event.parameter.userName || 'Kullanıcı'),
+    email: email,
+    role: user && user.Rol || 'guest',
     active: user ? isActive_(user.Aktif) : Boolean(parameterEmail),
     source: sessionEmail ? 'google-account' : (parameterEmail ? 'parameter' : 'unknown')
   };
@@ -123,13 +95,10 @@ function getCurrentUserContext() {
   return getCurrentUser_({ parameter: {} });
 }
 
-function formatProduct_(product) {
-  const copy = Object.assign({}, product);
-  ['SonKontrolTarihi', 'SonrakiKontrolTarihi', 'GuncellenmeTarihi'].forEach(key => {
-    copy[key] = formatDate_(copy[key]);
-  });
-  delete copy._row;
-  return copy;
+function formatDate_(value, format) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  return isNaN(date.getTime()) ? '' : Utilities.formatDate(date, Session.getScriptTimeZone(), format || 'dd.MM.yyyy');
 }
 
 function searchProducts(query, filters) {
@@ -143,7 +112,12 @@ function searchProducts(query, filters) {
     .filter(product => !options.status || String(product.Durum || '') === String(options.status))
     .filter(product => !options.location || String(product.AnaKonum || '') === String(options.location))
     .slice(0, 50)
-    .map(formatProduct_);
+    .map(product => {
+      const result = Object.assign({}, product);
+      ['SonKontrolTarihi', 'SonrakiKontrolTarihi', 'GuncellenmeTarihi'].forEach(key => result[key] = formatDate_(result[key]));
+      delete result._row;
+      return result;
+    });
 }
 
 function getProductByNo(productNo) {
@@ -154,7 +128,6 @@ function getProductByNo(productNo) {
 function getMovementHistory(productNo) {
   return getRows_(CONFIG.sheets.movements)
     .filter(row => normalize_(row.MastarNo) === normalize_(productNo))
-    .sort((a, b) => (parseDate_(b.TarihSaat) || 0) - (parseDate_(a.TarihSaat) || 0))
     .slice(0, 50)
     .map(row => Object.assign({}, row, { TarihSaat: formatDate_(row.TarihSaat, 'dd.MM.yyyy HH:mm:ss') }));
 }
@@ -164,31 +137,19 @@ function saveMovement(data) {
   const input = data || {};
   const product = getProductByNo(input.mastarNo);
   if (!product) throw new Error('Mastar bulunamadı.');
+  const user = getCurrentUser_({ parameter: { userEmail: input.userEmail || '', userName: input.userName || '' } });
+  if (!user.active || !['admin', 'operator'].includes(String(user.role).toLowerCase())) throw new Error('Bu işlem için yetkiniz bulunmuyor.');
 
-  const user = getCurrentUser_({ parameter: {
-    userEmail: input.userEmail || '',
-    userName: input.userName || ''
-  }});
-  if (!user.active || !['admin', 'operator'].includes(String(user.role).toLowerCase())) {
-    throw new Error('Bu işlem için yetkiniz bulunmuyor.');
-  }
-
-  const mainLocation = String(input.newMainLocation ?? product.AnaKonum ?? '').trim();
-  const detailLocation = String(input.newDetailLocation ?? product.DetayKonum ?? '').trim();
-  const status = String(input.newStatus ?? product.Durum ?? '').trim();
-  const movementType = String(input.movementType || 'Al').trim();
-  const description = String(input.description || 'İşlem kaydı').trim();
-  const now = new Date();
+  const mainLocation = String(input.newMainLocation == null ? product.AnaKonum || '' : input.newMainLocation).trim();
+  const detailLocation = String(input.newDetailLocation == null ? product.DetayKonum || '' : input.newDetailLocation).trim();
+  const status = String(input.newStatus == null ? product.Durum || '' : input.newStatus).trim();
   const spreadsheet = getSpreadsheet_();
-
   spreadsheet.getSheetByName(CONFIG.sheets.movements).appendRow([
-    Utilities.getUuid(), now, user.email, user.name, product.MastarNo, product.UrunAdi,
-    movementType, product.AnaKonum || '', product.DetayKonum || '', mainLocation,
-    detailLocation, product.Durum || '', status, description, String(input.source || 'MastarTakip')
+    Utilities.getUuid(), new Date(), user.email, user.name, product.MastarNo, product.UrunAdi,
+    String(input.movementType || 'Al'), product.AnaKonum || '', product.DetayKonum || '', mainLocation,
+    detailLocation, product.Durum || '', status, String(input.description || 'İşlem kaydı'), String(input.source || 'MastarTakip')
   ]);
-  spreadsheet.getSheetByName(CONFIG.sheets.products).getRange(product._row, 5, 1, 3)
-    .setValues([[mainLocation, detailLocation, status]]);
-
+  spreadsheet.getSheetByName(CONFIG.sheets.products).getRange(product._row, 5, 1, 3).setValues([[mainLocation, detailLocation, status]]);
   return { success: true };
 }
 
