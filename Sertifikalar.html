@@ -9,25 +9,87 @@
 <body>
   <?!= include('Header'); ?>
   <main class="page-shell">
-    <div class="page-toolbar"><div><p class="eyebrow">KALİBRASYON</p><h1>Sertifikalar</h1><p class="muted">Geçerlilik tarihi, kalan süre ve uyarıları tek ekranda takip edin.</p></div><a class="button button-secondary" href="?page=Index">Hızlı işlem</a></div>
-    <section class="stat-grid certificate-stats"><div class="stat-card"><strong id="total">-</strong><span>toplam</span></div><div class="stat-card stat-valid"><strong id="valid">-</strong><span>geçerli</span></div><div class="stat-card stat-warning"><strong id="soon">-</strong><span>60 gün içinde</span></div><div class="stat-card stat-danger"><strong id="expired">-</strong><span>süresi dolmuş</span></div></section>
-    <section class="calibration-grid">
-      <div class="panel chart-panel"><h2>Durum dağılımı</h2><div id="pie" class="pie-chart"></div><div id="legend" class="chart-legend"></div></div>
-      <div class="panel"><h2>Filtrele</h2><div class="filter-grid"><label class="field">Arama<input id="query" placeholder="Mastar, sertifika, kurum"></label><label class="field">Tür<select id="type"><option value="">Tümü</option></select></label><label class="field">Durum<select id="status"><option value="">Tümü</option></select></label><label class="field check-field"><input id="soonOnly" type="checkbox"> Sadece 60 gün içinde</label></div><button class="button button-primary" onclick="loadCertificates()">Filtrele</button><button class="button button-secondary" onclick="clearFilters()">Temizle</button></div>
+    <div class="page-toolbar">
+      <div>
+        <p class="eyebrow">KALİBRASYON</p>
+        <h1>Kalibrasyon Giriş</h1>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="search-line">
+        <input id="productQuery" placeholder="Ürün kodu veya ürün adı" autocomplete="off">
+        <button class="button button-primary" type="button" onclick="loadProductMatch()">Ürün Seç</button>
+      </div>
     </section>
-    <section class="panel"><div class="section-head"><h2>Sertifika tablosu</h2><span id="count" class="muted"></span></div><div id="table"></div></section>
+
+    <section class="panel" id="certificateFormPanel">
+      <div id="selectedProductSummary"></div>
+      <div class="form-grid" style="margin-top:16px;">
+        <label class="field">Mastar No<input id="mastarNo"></label>
+        <label class="field">Sertifika No<input id="certificateNo"></label>
+        <label class="field">Sertifika Türü<select id="certificateType"><option value="Kalibrasyon">Kalibrasyon</option><option value="Uygunluk">Uygunluk</option><option value="Ayrıcalık">Ayrıcalık</option></select></label>
+        <label class="field">Kurum<input id="organization"></label>
+        <label class="field">Sertifika Tarihi<input id="certificateDate" type="date"></label>
+        <label class="field">Geçerlilik Tarihi<input id="validityDate" type="date"></label>
+        <label class="field">Dosya URL<input id="fileUrl"></label>
+        <label class="field">Konum<select id="location"><option>Depo</option><option>Kalite</option><option>Bakım</option><option>Atölye</option></select></label>
+        <label class="field">Atanacak kişi<input id="assignedTo"></label>
+        <label class="field" style="grid-column:1 / -1;">Açıklama<textarea id="description" rows="3"></textarea></label>
+      </div>
+      <div class="save-row">
+        <button class="button button-primary" type="button" onclick="saveCertificateEntry()">Kalibrasyon Kaydet</button>
+      </div>
+      <p id="certificateMessage" class="form-message"></p>
+    </section>
   </main>
+
   <script>window.APP_CONTEXT = <?= userContext ?>;</script>
   <script>
-    document.addEventListener('DOMContentLoaded', function () { loadOptions(); loadSummary(); loadCertificates(); });
-    function loadOptions() { google.script.run.withSuccessHandler(function (data) { fill('type', data.types); fill('status', data.statuses); }).getCertificateFilterOptions(); }
-    function fill(id, values) { values.forEach(function (value) { var option = document.createElement('option'); option.value = value; option.textContent = value; document.getElementById(id).appendChild(option); }); }
-    function loadSummary() { google.script.run.withSuccessHandler(function (data) { ['total','valid','soon','expired'].forEach(function (key) { document.getElementById(key).textContent = data[key === 'soon' ? 'expiringSoon' : key]; }); renderPie(data); }).getCertificateSummary(); }
-    function renderPie(data) { var values = [data.valid, data.expiringSoon, data.expired, data.noDate]; var labels = ['Geçerli','60 Gün İçinde','Süresi Dolmuş','Tarih Yok']; var colors = ['#16a34a','#f59e0b','#dc2626','#94a3b8']; var total = values.reduce(function(a,b){return a+b},0) || 1; var start = 0; var parts = []; values.forEach(function (value, i) { var end = start + value / total * 360; parts.push(colors[i] + ' ' + start + 'deg ' + end + 'deg'); start = end; }); document.getElementById('pie').style.background = 'conic-gradient(' + parts.join(',') + ')'; document.getElementById('legend').innerHTML = labels.map(function(label,i){return '<span><i style="background:'+colors[i]+'"></i>'+label+' ('+values[i]+')</span>'}).join(''); }
-    function loadCertificates() { var filters = { query: document.getElementById('query').value, certificateType: document.getElementById('type').value, status: document.getElementById('status').value, expiringSoon: document.getElementById('soonOnly').checked }; google.script.run.withSuccessHandler(renderTable).getCertificates(filters); }
-    function clearFilters() { document.getElementById('query').value=''; document.getElementById('type').value=''; document.getElementById('status').value=''; document.getElementById('soonOnly').checked=false; loadCertificates(); }
-    function renderTable(rows) { document.getElementById('count').textContent = rows.length + ' kayıt'; if (!rows.length) { document.getElementById('table').innerHTML='<p class="muted">Kayıt bulunamadı.</p>'; return; } document.getElementById('table').innerHTML='<div class="table-scroll"><table class="data-table"><thead><tr><th>Mastar</th><th>Sertifika</th><th>Tür</th><th>Kurum</th><th>Sertifika tarihi</th><th>Geçerlilik</th><th>Kalan</th><th>Durum</th></tr></thead><tbody>'+rows.map(function(row){var cls=row.SertifikaDurumu==='Süresi Dolmuş'?'danger':row.SertifikaDurumu==='60 Gün İçinde'?'warning':'valid';return '<tr><td><strong>'+safe(row.MastarNo)+'</strong></td><td>'+safe(row.SertifikaNo)+'</td><td>'+safe(row.SertifikaTuru)+'</td><td>'+safe(row.Kurum)+'</td><td>'+safe(row.SertifikaTarihi)+'</td><td>'+safe(row.GecerlilikTarihi)+'</td><td>'+(row.KalanGun===null?'-':row.KalanGun+' gün')+'</td><td><span class="status-badge '+cls+'">'+safe(row.SertifikaDurumu)+'</span></td></tr>';}).join('')+'</tbody></table></div>'; }
-    function safe(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+    function loadProductMatch() {
+      const q = document.getElementById('productQuery').value.trim();
+      if (!q) {
+        document.getElementById('selectedProductSummary').innerHTML = '<p class="muted">Ürün seçmek için arama yapın.</p>';
+        return;
+      }
+      google.script.run.withSuccessHandler((rows) => {
+        const result = rows && rows[0];
+        if (!result) {
+          document.getElementById('selectedProductSummary').innerHTML = '<p class="muted">Ürün bulunamadı.</p>';
+          return;
+        }
+        document.getElementById('mastarNo').value = result.MastarNo;
+        document.getElementById('selectedProductSummary').innerHTML = '<div class="info-box"><strong>' + safe(result.UrunAdi) + '</strong><span>' + safe(result.MastarNo) + ' · ' + safe(result.AnaKonum || 'Depo') + ' / ' + safe(result.DetayKonum || '-') + '</span></div>';
+      }).searchProducts(q, { includeAll: true });
+    }
+
+    function saveCertificateEntry() {
+      const payload = {
+        mastarNo: document.getElementById('mastarNo').value,
+        certificateNo: document.getElementById('certificateNo').value,
+        certificateType: document.getElementById('certificateType').value,
+        organization: document.getElementById('organization').value,
+        certificateDate: document.getElementById('certificateDate').value,
+        validityDate: document.getElementById('validityDate').value,
+        fileUrl: document.getElementById('fileUrl').value,
+        description: document.getElementById('description').value,
+        assignedTo: document.getElementById('assignedTo').value,
+        userEmail: window.APP_CONTEXT.email,
+        userName: window.APP_CONTEXT.name,
+        source: 'KalibrasyonGiris'
+      };
+      google.script.run.withSuccessHandler(() => {
+        document.getElementById('certificateMessage').textContent = 'Kalibrasyon kaydı eklendi.';
+        document.getElementById('certificateMessage').className = 'form-message success';
+      }).withFailureHandler((error) => {
+        document.getElementById('certificateMessage').textContent = error.message || 'Kayıt başarısız.';
+        document.getElementById('certificateMessage').className = 'form-message error';
+      }).saveCertificate(payload);
+    }
+
+    function safe(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]; });
+    }
   </script>
 </body>
 </html>
