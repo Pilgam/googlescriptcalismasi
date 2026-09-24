@@ -1,0 +1,231 @@
+const SHEET_CONFIG = {
+  products: 'Urunler',
+  movements: 'Hareketler',
+  users: 'Kullanicilar'
+};
+
+function doGet(e) {
+  const requestedPage = e && e.parameter && e.parameter.page ? e.parameter.page : 'Index';
+  const pageName = requestedPage.toLowerCase() === 'mastertakip' ? 'MasterTakip' : 'Index';
+
+  const template = HtmlService.createTemplateFromFile(pageName);
+  template.pageTitle = pageName === 'MasterTakip' ? 'Mastar Takip' : 'Ana Menü';
+
+  return template
+    .evaluate()
+    .setTitle('Mastar Takip')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function ensureSheets() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+  Object.keys(SHEET_CONFIG).forEach((key) => {
+    let sheet = spreadsheet.getSheetByName(SHEET_CONFIG[key]);
+
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(SHEET_CONFIG[key]);
+    }
+
+    if (key === 'products' && sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, 7).setValues([
+        ['UrunNo', 'UrunAdi', 'Aciklama', 'AnaKonum', 'DetayKonum', 'Durum', 'GuncellenmeTarihi']
+      ]);
+    }
+
+    if (key === 'movements' && sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, 8).setValues([
+        ['Tarih', 'Kullanici', 'UrunNo', 'HareketTuru', 'EskiKonum', 'YeniKonum', 'Aciklama', 'UrunAdi']
+      ]);
+    }
+
+    if (key === 'users' && sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, 3).setValues([
+        ['KullaniciAdi', 'Email', 'Aktif']
+      ]);
+    }
+
+    if (key === 'products' && sheet.getLastRow() === 1) {
+      seedExampleProducts(sheet);
+    }
+  });
+}
+
+function seedExampleProducts(sheet) {
+  const sampleRows = [
+    ['P-1001', 'Masaüstü PC', 'İş istasyonu', 'Depo-1', 'Raf-A1', 'Hazır', new Date()],
+    ['P-1002', 'Sunucu', 'Veri merkezi sunucusu', 'Depo-2', 'Kabin-3', 'Beklemede', new Date()],
+    ['P-1003', 'Monitör', '27 inç kurulum', 'Merkez', 'Saha-12', 'Yolda', new Date()],
+    ['P-1004', 'Yazıcı', 'A3 ağ yazıcısı', 'Depo-1', 'Raf-B4', 'Stokta', new Date()]
+  ];
+
+  sheet.getRange(2, 1, sampleRows.length, sampleRows[0].length).setValues(sampleRows);
+}
+
+function getProductsSheet() {
+  ensureSheets();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  return spreadsheet.getSheetByName(SHEET_CONFIG.products);
+}
+
+function getMovementsSheet() {
+  ensureSheets();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  return spreadsheet.getSheetByName(SHEET_CONFIG.movements);
+}
+
+function rowToProduct(row) {
+  const headers = ['UrunNo', 'UrunAdi', 'Aciklama', 'AnaKonum', 'DetayKonum', 'Durum', 'GuncellenmeTarihi'];
+  const product = {};
+
+  headers.forEach((header, index) => {
+    product[header] = row[index] || '';
+  });
+
+  return product;
+}
+
+function getProductByNo(productNo) {
+  const sheet = getProductsSheet();
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) {
+    return null;
+  }
+
+  const headers = values[0];
+  const rows = values.slice(1);
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    const currentProductNo = String(row[0] || '').trim();
+
+    if (currentProductNo.toLowerCase() === String(productNo || '').trim().toLowerCase()) {
+      const product = {};
+      headers.forEach((header, index) => {
+        product[header] = row[index] || '';
+      });
+      return {
+        rowIndex: i + 2,
+        product
+      };
+    }
+  }
+
+  return null;
+}
+
+function searchProducts(query) {
+  ensureSheets();
+  const sheet = getProductsSheet();
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) {
+    return [];
+  }
+
+  const keyword = String(query || '').trim().toLowerCase();
+  if (!keyword) {
+    return [];
+  }
+
+  const headers = values[0];
+  const rows = values.slice(1);
+
+  const results = rows
+    .map((row) => rowToProduct(row))
+    .filter((product) => {
+      const no = String(product.UrunNo || '').toLowerCase();
+      const name = String(product.UrunAdi || '').toLowerCase();
+      const description = String(product.Aciklama || '').toLowerCase();
+      return no.includes(keyword) || name.includes(keyword) || description.includes(keyword);
+    })
+    .slice(0, 20);
+
+  return results.map((product) => ({
+    ...product,
+    GuncellenmeTarihi: product.GuncellenmeTarihi ? Utilities.formatDate(new Date(product.GuncellenmeTarihi), Session.getScriptTimeZone(), 'dd.MM.yyyy') : ''
+  }));
+}
+
+function getMovementHistory(productNo) {
+  ensureSheets();
+  const sheet = getMovementsSheet();
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) {
+    return [];
+  }
+
+  const keyword = String(productNo || '').trim();
+
+  return values.slice(1)
+    .filter((row) => String(row[2] || '').trim().toLowerCase() === keyword.toLowerCase())
+    .map((row) => ({
+      Tarih: row[0],
+      Kullanici: row[1],
+      UrunNo: row[2],
+      HareketTuru: row[3],
+      EskiKonum: row[4],
+      YeniKonum: row[5],
+      Aciklama: row[6],
+      UrunAdi: row[7]
+    }))
+    .slice(0, 20)
+    .reverse();
+}
+
+function saveMovement(productNo, movementType, location, description, userName) {
+  ensureSheets();
+
+  const productRecord = getProductByNo(productNo);
+  if (!productRecord) {
+    throw new Error('Ürün bulunamadı: ' + productNo);
+  }
+
+  const product = productRecord.product;
+  const oldLocation = String(product.AnaKonum || '').trim();
+  const now = new Date();
+  const movementSheet = getMovementsSheet();
+  const productSheet = getProductsSheet();
+
+  const targetLocation = String(location || '').trim();
+  const nextDescription = String(description || '').trim();
+  const currentUser = String(userName || '').trim() || 'Sistem';
+
+  productSheet.getRange(productRecord.rowIndex, 4, 1, 2).setValues([[targetLocation, targetLocation]]);
+  productSheet.getRange(productRecord.rowIndex, 6).setValue('Guncellendi');
+  productSheet.getRange(productRecord.rowIndex, 7).setValue(now);
+
+  movementSheet.appendRow([
+    Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm'),
+    currentUser,
+    product.UrunNo,
+    movementType,
+    oldLocation,
+    targetLocation,
+    nextDescription,
+    product.UrunAdi
+  ]);
+
+  return {
+    success: true,
+    productNo: product.UrunNo,
+    newLocation: targetLocation,
+    movementType: movementType,
+    userName: currentUser
+  };
+}
+
+function getMenuItems() {
+  return [
+    { title: 'Ana Menü', page: 'Index' },
+    { title: 'Mastar Takip', page: 'MasterTakip' },
+    { title: 'Ürün Arama', page: 'MasterTakip' },
+    { title: 'Raporlar', page: 'Index' }
+  ];
+}

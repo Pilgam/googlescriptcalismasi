@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root {
+        --bg: #f4f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --primary-dark: #1d4ed8;
+        --border: #dfe7f5;
+        --success: #16a34a;
+        --warning: #f59e0b;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        font-family: Arial, sans-serif;
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 960px;
+        margin: 32px auto;
+        padding: 20px;
+      }
+
+      .header {
+        margin-bottom: 24px;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+
+      .header p {
+        margin: 8px 0 0;
+        color: var(--muted);
+      }
+
+      .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+      }
+
+      .menu-card {
+        display: block;
+        padding: 24px 16px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        text-decoration: none;
+        color: var(--text);
+        font-weight: 700;
+        text-align: center;
+        transition: 0.2s ease;
+      }
+
+      .menu-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.12);
+        border-color: var(--primary);
+      }
+
+      .menu-card.primary {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+      }
+
+      .menu-card.primary:hover {
+        background: var(--primary-dark);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Ana Menü</h1>
+        <p>Örnek iş akışı. Bu ekran başlangıç ekranı değildir; diğer modüllere bağlantı sağlar.</p>
+      </div>
+
+      <div class="menu-grid">
+        <a class="menu-card primary" href="?page=MasterTakip">Mastar Takip</a>
+        <a class="menu-card" href="?page=MasterTakip">Ürün Arama</a>
+        <a class="menu-card" href="?page=Index">Hareket Listesi</a>
+        <a class="menu-card" href="?page=Index">Konumlar</a>
+        <a class="menu-card" href="?page=Index">Raporlar</a>
+        <a class="menu-card" href="?page=Index">Ayarlar</a>
+      </div>
+    </div>
+  </body>
+</html>

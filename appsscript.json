@@ -1,0 +1,9 @@
+{
+  "timeZone": "Europe/Istanbul",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "web": {
+    "access": "ANYONE",
+    "executeAs": "USER_DEPLOYING"
+  }
+}
