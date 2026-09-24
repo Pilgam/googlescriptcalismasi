@@ -13,7 +13,7 @@
       <div>
         <p class="eyebrow">MASTAR YÖNETİMİ</p>
         <h1>Hızlı işlem merkezi</h1>
-        <p class="muted">Mastarı kodu veya adıyla ara, seç ve al/geri koy/transfer işlemini anında kaydet.</p>
+        <p class="muted">Mastarı kodu veya adıyla ara, seç, işlemi kaydet ve sertifikaları anlık kontrol et.</p>
       </div>
       <div class="hero-stats">
         <div>
@@ -33,7 +33,7 @@
         <label class="check-box"><input id="includeAll" type="checkbox"> Pasifler dahil</label>
         <button class="button button-primary" onclick="searchProducts_()">Bul</button>
       </div>
-      <p id="searchHint" class="muted">Yazım hatalarını ve yakın kod/isim eşleşmelerini de bulmaya çalışır.</p>
+      <p id="searchHint" class="muted">Yazım hatalarını ve yakın kod/isim eşleşmelerini otomatik bulur.</p>
     </section>
 
     <div class="workspace">
@@ -51,6 +51,34 @@
         <div id="detailContent"></div>
       </section>
     </div>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Kalibrasyon / sertifika özeti</h2>
+        <span id="certSummaryLabel" class="muted">Yükleniyor...</span>
+      </div>
+
+      <div class="calibration-grid">
+        <div class="chart-panel">
+          <div id="pieChart" class="pie-chart"></div>
+          <div id="chartLegend" class="chart-legend"></div>
+        </div>
+
+        <div>
+          <div class="filter-grid">
+            <label class="field">Arama<input id="certQuery" placeholder="Mastar, sertifika, kurum"></label>
+            <label class="field">Tür<select id="certType"><option value="">Tümü</option></select></label>
+            <label class="field">Durum<select id="certStatus"><option value="">Tümü</option></select></label>
+            <label class="field check-field"><input id="expiringSoonOnly" type="checkbox"> Sadece 60 gün içinde</label>
+          </div>
+          <div class="inline-actions">
+            <button class="button button-primary" onclick="loadCertificateOverview()">Filtrele</button>
+            <button class="button button-secondary" onclick="resetCertificateFilters()">Temizle</button>
+          </div>
+          <div id="productCertificateTable" class="table-wrap"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script>window.APP_CONTEXT = <?= userContext ?>;</script>
@@ -58,8 +86,15 @@
     let selectedProduct = null;
     let searchRows = [];
 
-    document.getElementById('globalSearch').addEventListener('keydown', function (event) {
-      if (event.key === 'Enter') searchProducts_();
+    document.addEventListener('DOMContentLoaded', function () {
+      loadCertificateFilters();
+      loadCertificateOverview();
+      document.getElementById('globalSearch').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') searchProducts_();
+      });
+      document.getElementById('certQuery').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') loadCertificateOverview();
+      });
     });
 
     function searchProducts_() {
@@ -93,6 +128,7 @@
     function selectProduct(index) {
       selectedProduct = searchRows[index];
       renderSelectedProduct();
+      loadCertificateOverview(selectedProduct && selectedProduct.MastarNo);
     }
 
     function renderSelectedProduct() {
@@ -121,11 +157,21 @@
 
     function setAction(type) {
       const form = document.getElementById('actionForm');
+      const defaultReasons = {
+        'Al': ['Ölçüm için kullanım', 'Kullanım sırasında gerekli', 'Ölçüm ve kontrol'],
+        'Geri Koy': ['Depoya geri iade', 'Kullanım sonrası iade', 'Kayıt altına alınan dönüş'],
+        'Transfer': ['Transfer / konum değişimi', 'İşlem alanı değişimi', 'Uygulama yeri taşıma'],
+        'Kontrol': ['Kontrol / muayene', 'Kalibrasyon kontrolü', 'Saha kontrolleri']
+      };
+      const reasonOptions = (defaultReasons[type] || defaultReasons.Al).map(function (reason) {
+        return '<option value="' + safeAttr(reason) + '">' + safe(reason) + '</option>';
+      }).join('');
+
       form.innerHTML = '<div class="form-grid">' +
         '<label class="field">İşlem<select id="movementType"><option value="' + type + '">' + type + '</option><option value="Al">Al</option><option value="Geri Koy">Geri Koy</option><option value="Transfer">Transfer</option><option value="Kontrol">Kontrol</option></select></label>' +
         '<label class="field">Yeni ana konum<input id="mainLocation" value="' + safeAttr(selectedProduct.AnaKonum) + '"></label>' +
         '<label class="field">Detay / kimde<input id="detailLocation" value="' + safeAttr(selectedProduct.DetayKonum) + '" placeholder="Kişi, raf, dolap, saha..."></label>' +
-        '<label class="field">Neden / açıklama<input id="reason" placeholder="Kullanım amacı veya iade nedeni"></label>' +
+        '<label class="field">Neden / açıklama<select id="reasonPreset"><option value="">Özel yaz</option>' + reasonOptions + '</select></label>' +
       '</div>' +
       '<div class="save-row"><button class="button button-primary" onclick="saveMovement_()">İşlemi kaydet</button></div>' +
       '<p id="actionMessage" class="form-message"></p>';
@@ -138,7 +184,8 @@
         newMainLocation: document.getElementById('mainLocation').value,
         newDetailLocation: document.getElementById('detailLocation').value,
         newStatus: selectedProduct.Durum,
-        description: document.getElementById('reason').value,
+        description: document.getElementById('reasonPreset').value || '',
+        reasonPreset: document.getElementById('reasonPreset').value,
         userEmail: window.APP_CONTEXT.email,
         userName: window.APP_CONTEXT.name,
         source: 'HizliIslem'
@@ -148,6 +195,7 @@
         showActionMessage('İşlem kaydedildi.', 'success');
         searchProducts_();
         loadHistory(selectedProduct.MastarNo);
+        loadCertificateOverview(selectedProduct.MastarNo);
       }).withFailureHandler(function (error) {
         showActionMessage(error.message || 'Kayıt sırasında hata oluştu.', 'error');
       }).saveMovement(payload);
@@ -164,6 +212,91 @@
           return '<tr><td>' + safe(row.TarihSaat) + '</td><td>' + safe(row.HareketTuru) + '</td><td>' + safe(row.KullaniciAdi) + '</td><td>' + safe(row.EskiAnaKonum) + ' → ' + safe(row.YeniAnaKonum) + '</td><td>' + safe(row.Aciklama) + '</td></tr>';
         }).join('') + '</tbody></table>';
       }).getMovementHistory(productNo);
+    }
+
+    function loadCertificateFilters() {
+      google.script.run.withSuccessHandler(function (data) {
+        fillSelect('certType', data.types);
+        fillSelect('certStatus', data.statuses);
+      }).getCertificateFilterOptions();
+    }
+
+    function fillSelect(id, values) {
+      const el = document.getElementById(id);
+      values.forEach(function (value) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        el.appendChild(option);
+      });
+    }
+
+    function loadCertificateOverview(productNo) {
+      const query = document.getElementById('certQuery').value.trim();
+      const certType = document.getElementById('certType').value;
+      const certStatus = document.getElementById('certStatus').value;
+      const expiringSoonOnly = document.getElementById('expiringSoonOnly').checked;
+      const filters = {
+        mastarNo: productNo || '',
+        query: query,
+        certificateType: certType,
+        status: certStatus,
+        expiringSoon: expiringSoonOnly
+      };
+
+      google.script.run.withSuccessHandler(function (rows) {
+        renderCertificateTable(rows, productNo);
+      }).getCertificates(filters);
+
+      google.script.run.withSuccessHandler(function (data) {
+        renderPieChart(data);
+        document.getElementById('certSummaryLabel').textContent = data.total + ' sertifika';
+      }).getCertificateSummary();
+    }
+
+    function renderPieChart(data) {
+      const values = [
+        Number(data.valid || 0),
+        Number(data.expiringSoon || 0),
+        Number(data.expired || 0),
+        Number(data.noDate || 0)
+      ];
+      const labels = ['Geçerli', '60 Gün İçinde', 'Süresi Dolmuş', 'Tarih Yok'];
+      const colors = ['#16a34a', '#f59e0b', '#dc2626', '#94a3b8'];
+      const total = values.reduce(function (sum, value) { return sum + value; }, 0) || 1;
+      let start = 0;
+      const segments = values.map(function (value, index) {
+        const end = start + (value / total) * 360;
+        const segment = colors[index] + ' ' + start + 'deg ' + end + 'deg';
+        start = end;
+        return segment;
+      });
+      document.getElementById('pieChart').style.background = 'conic-gradient(' + segments.join(', ') + ')';
+      document.getElementById('chartLegend').innerHTML = labels.map(function (label, index) {
+        return '<span><i style="background:' + colors[index] + '"></i>' + label + ' (' + values[index] + ')</span>';
+      }).join('');
+    }
+
+    function renderCertificateTable(rows, productNo) {
+      const el = document.getElementById('productCertificateTable');
+      if (!rows.length) {
+        el.innerHTML = '<p class="muted">Seçili kriterlere uygun sertifika bulunamadı.</p>';
+        return;
+      }
+
+      const title = productNo ? 'Seçili mastar sertifikaları' : 'Tüm sertifikalar';
+      el.innerHTML = '<div class="table-wrap"><h3>' + safe(title) + '</h3><table class="data-table"><thead><tr><th>Mastar</th><th>Sertifika</th><th>Tür</th><th>Kurum</th><th>Geçerlilik</th><th>Kalan</th><th>Durum</th></tr></thead><tbody>' + rows.map(function (row) {
+        const klass = row.SertifikaDurumu === 'Süresi Dolmuş' ? 'danger' : row.SertifikaDurumu === '60 Gün İçinde' ? 'warning' : 'valid';
+        return '<tr><td><strong>' + safe(row.MastarNo) + '</strong></td><td>' + safe(row.SertifikaNo) + '</td><td>' + safe(row.SertifikaTuru) + '</td><td>' + safe(row.Kurum) + '</td><td>' + safe(row.GecerlilikTarihi) + '</td><td>' + (row.KalanGun === null ? '-' : row.KalanGun + ' gün') + '</td><td><span class="status-badge ' + klass + '">' + safe(row.SertifikaDurumu) + '</span></td></tr>';
+      }).join('') + '</tbody></table></div>';
+    }
+
+    function resetCertificateFilters() {
+      document.getElementById('certQuery').value = '';
+      document.getElementById('certType').value = '';
+      document.getElementById('certStatus').value = '';
+      document.getElementById('expiringSoonOnly').checked = false;
+      loadCertificateOverview(selectedProduct && selectedProduct.MastarNo);
     }
 
     function showActionMessage(message, type) {

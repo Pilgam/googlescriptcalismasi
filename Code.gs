@@ -1,5 +1,3 @@
-const SPREADSHEET_ID = '18qCBAwLaMnMw4kOxu_KgfpOFe5SxOBo8c0SOGpqXZ-c';
-
 const APP_CONFIG = {
   appName: 'Mastar Takip',
   sheets: {
@@ -8,59 +6,94 @@ const APP_CONFIG = {
     movements: 'Hareketler',
     users: 'Kullanicilar'
   },
-  pages: ['Index', 'MasterTakip', 'Raporlar', 'Sertifikalar']
+  pages: {
+    home: 'Index',
+    masterTracking: 'MasterTakip'
+  }
 };
 
-const PRODUCT_HEADERS = ['MastarNo', 'UrunAdi', 'SeriNo', 'Aciklama', 'AnaKonum', 'DetayKonum', 'Durum', 'SorumluKisi', 'Aktif'];
-const MOVEMENT_HEADERS = ['HareketId', 'TarihSaat', 'KullaniciEmail', 'KullaniciAdi', 'MastarNo', 'MastarAdi', 'HareketTuru', 'EskiAnaKonum', 'EskiDetayKonum', 'YeniAnaKonum', 'YeniDetayKonum', 'EskiDurum', 'YeniDurum', 'Aciklama', 'Kaynak'];
+const PRODUCT_HEADERS = [
+  'MastarNo', 'UrunAdi', 'SeriNo', 'Aciklama', 'AnaKonum', 'DetayKonum',
+  'Durum', 'SorumluKisi', 'SonKontrolTarihi', 'SonrakiKontrolTarihi',
+  'KalibrasyonDurumu', 'Aktif', 'Guncelleyen', 'GuncellenmeTarihi'
+];
+
+const MOVEMENT_HEADERS = [
+  'HareketId', 'TarihSaat', 'KullaniciEmail', 'KullaniciAdi', 'MastarNo',
+  'MastarAdi', 'HareketTuru', 'EskiAnaKonum', 'EskiDetayKonum',
+  'YeniAnaKonum', 'YeniDetayKonum', 'EskiDurum', 'YeniDurum', 'Aciklama', 'Kaynak'
+];
+
 const USER_HEADERS = ['KullaniciAdi', 'Email', 'Rol', 'Aktif'];
-const CERTIFICATE_HEADERS = ['SertifikaId', 'MastarNo', 'SertifikaNo', 'SertifikaTuru', 'Kurum', 'SertifikaTarihi', 'GecerlilikTarihi', 'DosyaUrl', 'Durum', 'Aciklama', 'Aktif', 'Ekleyen', 'GuncellenmeTarihi'];
+const CERTIFICATE_HEADERS = [
+  'SertifikaId', 'MastarNo', 'SertifikaNo', 'SertifikaTuru', 'Kurum',
+  'SertifikaTarihi', 'GecerlilikTarihi', 'DosyaUrl', 'Durum', 'Aciklama',
+  'Aktif', 'Ekleyen', 'GuncellenmeTarihi'
+];
+
+const DEFAULT_REASON_MAP = {
+  Al: ['Ölçüm için kullanım', 'Kullanım sırasında gerekli', 'Ölçüm ve kontrol'],
+  'Geri Koy': ['Depoya geri iade', 'Kullanım sonrası iade', 'Kayıt altına alınan dönüş'],
+  Transfer: ['Transfer / konum değişimi', 'İşlem alanı değişimi', 'Uygulama yeri taşıma'],
+  Kontrol: ['Kontrol / muayene', 'Kalibrasyon kontrolü', 'Saha kontrolleri']
+};
 
 function doGet(e) {
   ensureSheets();
-  const requested = String((e && e.parameter && e.parameter.page) || 'Index');
-  const page = APP_CONFIG.pages.find((name) => name.toLowerCase() === requested.toLowerCase()) || 'Index';
+  const page = normalizePage_(e && e.parameter && e.parameter.page);
+  const user = getCurrentUser_(e);
   const template = HtmlService.createTemplateFromFile(page);
-  template.pageTitle = page === 'Index' ? 'Ana Menü' : page;
-  template.userContext = JSON.stringify(getCurrentUser_(e)).replace(/</g, '\\u003c');
-  return template.evaluate().setTitle(APP_CONFIG.appName).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  template.pageTitle = page === APP_CONFIG.pages.masterTracking ? 'Mastar Takip' : 'Ana Menü';
+  template.userContext = JSON.stringify(user).replace(/</g, '\\u003c');
+
+  return template.evaluate()
+    .setTitle(APP_CONFIG.appName)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function normalizePage_(requestedPage) {
+  return String(requestedPage || '').toLowerCase() === 'mastertakip'
+    ? APP_CONFIG.pages.masterTracking
+    : APP_CONFIG.pages.home;
+}
 
 function getSpreadsheet_() {
   try {
-    return SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(SPREADSHEET_ID);
+    return SpreadsheetApp.getActiveSpreadsheet();
   } catch (error) {
-    return SpreadsheetApp.openById(SPREADSHEET_ID);
+    return SpreadsheetApp.getActiveSpreadsheet();
   }
 }
 
 function ensureSheets() {
   const ss = getSpreadsheet_();
   ensureSheetWithHeaders_(ss, APP_CONFIG.sheets.products, PRODUCT_HEADERS, seedExampleProducts_);
-  ensureSheetWithHeaders_(ss, APP_CONFIG.sheets.certificates, CERTIFICATE_HEADERS, seedExampleCertificates_);
   ensureSheetWithHeaders_(ss, APP_CONFIG.sheets.movements, MOVEMENT_HEADERS);
   ensureSheetWithHeaders_(ss, APP_CONFIG.sheets.users, USER_HEADERS, seedExampleUsers_);
+  ensureSheetWithHeaders_(ss, APP_CONFIG.sheets.certificates, CERTIFICATE_HEADERS, seedExampleCertificates_);
 }
 
-function ensureSheetWithHeaders_(ss, name, headers, seedFn) {
+function ensureSheetWithHeaders_(ss, name, headers, seedFunction) {
   let sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
+
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
-    if (seedFn) seedFn(sheet);
+    if (seedFunction) seedFunction(sheet);
   }
 }
 
 function seedExampleProducts_(sheet) {
-  sheet.getRange(2, 1, 5, PRODUCT_HEADERS.length).setValues([
-    ['M-1001', 'G8 Tampon Mastar', 'SN-001', 'Dış çap kontrol mastarı', 'Depo-1', 'Raf-A1 / Göz-01', 'Hazır', 'Ahmet Yılmaz', true],
-    ['M-1002', 'Basınç Ölçüm Mastarı', 'SN-002', 'Basınç sensör doğrulama', 'Kalite', 'Dolap-2 / Göz-03', 'Kullanımda', 'Ayşe Demir', true],
-    ['M-1003', 'Vida Kalibrasyon Mastarı', 'SN-003', 'Vida kontrol ve doğrulama', 'Bakım', 'Atölye / Tezgah-04', 'Bakımda', '', true],
-    ['M-1004', 'Hassas Ölçüm Mastarı', 'SN-004', 'Hassas ölçüm doğrulama', 'Depo-2', 'Kabin-B / Raf-02', 'Hazır', '', true],
-    ['M-1005', 'Görsel Kalite Mastarı', 'SN-005', 'Optik kontrol mastarı', 'Merkez', 'Saha-12 / Stok-02', 'Pasif', '', false]
+  sheet.getRange(2, 1, 4, PRODUCT_HEADERS.length).setValues([
+    ['M-1001', 'Ölçüm Mastarı', 'SN-001', 'Örnek dış çap kontrol mastarı', 'Depo-1', 'Raf-A1 / Göz-01', 'Hazır', 'Ahmet Yılmaz', '01.09.2026', '01.03.2027', 'Geçerli', true, 'Sistem', new Date()],
+    ['M-1002', 'Derinlik Mastarı', 'SN-002', 'Örnek derinlik kontrol mastarı', 'Kalite', 'Dolap-2 / Göz-03', 'Kullanımda', 'Ayşe Demir', '15.08.2026', '15.02.2027', 'Geçerli', true, 'Sistem', new Date()],
+    ['M-1003', 'Vida Mastarı', 'SN-003', 'Örnek vida kontrol mastarı', 'Bakım', 'Atölye / Tezgah-04', 'Bakımda', '', '20.07.2026', '20.01.2027', 'Bekliyor', true, 'Sistem', new Date()],
+    ['M-1004', 'Hassas Ölçüm Mastarı', 'SN-004', 'Örnek hassas ölçüm ekipmanı', 'Depo-2', 'Kabin-B / Raf-02', 'Hazır', '', '05.09.2026', '05.03.2027', 'Geçerli', true, 'Sistem', new Date()]
   ]);
 }
 
@@ -72,15 +105,43 @@ function seedExampleUsers_(sheet) {
 }
 
 function seedExampleCertificates_(sheet) {
-  sheet.getRange(2, 1, 3, CERTIFICATE_HEADERS.length).setValues([
-    ['S-001', 'M-1001', 'KAL-2026-001', 'Kalibrasyon', 'ABC Kalibrasyon', '2026-09-01', '2027-09-01', 'https://example.com/1', 'Geçerli', 'Yıllık kalibrasyon', true, 'Yönetici', new Date()],
-    ['S-002', 'M-1001', 'UYG-2026-023', 'Uygunluk', 'ISO Lab', '2026-09-15', '2026-12-15', 'https://example.com/2', '60 Gün İçinde', 'Yıllık uygunluk', true, 'Yönetici', new Date()],
-    ['S-003', 'M-1002', 'KAL-2026-007', 'Kalibrasyon', 'XYZ Lab', '2026-08-10', '2026-09-20', 'https://example.com/3', 'Süresi Dolmuş', 'Geçerlilik bitti', true, 'Operatör', new Date()]
+  const today = new Date();
+  const addDays = (n) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() + n);
+    return date;
+  };
+
+  sheet.getRange(2, 1, 4, CERTIFICATE_HEADERS.length).setValues([
+    ['S-001', 'M-1001', 'KAL-2026-001', 'Kalibrasyon', 'ABC Kalibrasyon', addDays(-10), addDays(25), 'https://example.com/1', '60 Gün İçinde', 'Yıllık kalibrasyon', true, 'Yönetici', new Date()],
+    ['S-002', 'M-1002', 'UYG-2026-023', 'Uygunluk', 'ISO Lab', addDays(4), addDays(120), 'https://example.com/2', 'Geçerli', 'Yıllık uygunluk', true, 'Yönetici', new Date()],
+    ['S-003', 'M-1003', 'KAL-2026-007', 'Kalibrasyon', 'XYZ Lab', addDays(-120), addDays(-10), 'https://example.com/3', 'Süresi Dolmuş', 'Geçerlilik bitti', true, 'Operatör', new Date()],
+    ['S-004', 'M-1004', 'TST-2026-015', 'Test', 'Laboratuvar A', addDays(-20), addDays(85), 'https://example.com/4', 'Geçerli', 'Düzenli kontrol', true, 'Operatör', new Date()]
   ]);
 }
 
+function getCurrentUser_(e) {
+  const email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+  const parameterEmail = String(e && e.parameter && e.parameter.userEmail || '').trim().toLowerCase();
+  const resolvedEmail = email || parameterEmail;
+  const users = getSheetObjects_(APP_CONFIG.sheets.users);
+  const record = users.find((row) => String(row.Email || '').trim().toLowerCase() === resolvedEmail);
+
+  return {
+    name: record && record.KullaniciAdi ? record.KullaniciAdi : String(e && e.parameter && e.parameter.userName || 'Kullanıcı'),
+    email: resolvedEmail,
+    role: record && record.Rol ? record.Rol : 'guest',
+    active: record ? String(record.Aktif).toLowerCase() !== 'false' : Boolean(parameterEmail),
+    source: email ? 'google-account' : (parameterEmail ? 'integration-parameter' : 'unknown')
+  };
+}
+
+function getCurrentUserContext() {
+  return getCurrentUser_({ parameter: {} });
+}
+
 function getSheetObjects_(sheetName) {
-  const sheet = getSpreadsheet_().getSheetByName(sheetName);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return [];
   const values = sheet.getDataRange().getValues();
   const headers = values[0];
@@ -105,88 +166,48 @@ function isActive_(value) {
   return value !== false && String(value).toLowerCase() !== 'false';
 }
 
-function levenshtein_(a, b) {
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i]);
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + (a[j - 1] === b[i - 1] ? 0 : 1)
-      );
-    }
-  }
-  return matrix[b.length][a.length];
-}
-
-function scoreProduct_(product, keyword) {
-  if (!keyword) return 1;
-  const query = normalize_(keyword);
-  const tokens = query.split(' ').filter(Boolean);
-  const fields = [product.MastarNo, product.UrunAdi, product.SeriNo, product.Aciklama].map(normalize_);
-  let score = 0;
-  fields.forEach((field, index) => {
-    if (!field) return;
-    if (field === query) score += 100 - index * 5;
-    if (field.includes(query)) score += 60 - index * 5;
-    tokens.forEach((token) => {
-      if (field.includes(token)) score += 18;
-      else if (field.split(' ').some((word) => levenshtein_(word, token) <= Math.max(1, Math.floor(token.length / 3)))) score += 7;
-    });
+function formatProduct_(product) {
+  const copy = Object.assign({}, product);
+  ['SonKontrolTarihi', 'SonrakiKontrolTarihi', 'GuncellenmeTarihi'].forEach((key) => {
+    if (copy[key] instanceof Date) copy[key] = Utilities.formatDate(copy[key], Session.getScriptTimeZone(), 'dd.MM.yyyy');
   });
-  return score;
-}
-
-function getCurrentUser_(e) {
-  const accountEmail = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
-  const parameterEmail = String(e && e.parameter && e.parameter.userEmail || '').trim().toLowerCase();
-  const email = accountEmail || parameterEmail;
-  const users = getSheetObjects_(APP_CONFIG.sheets.users);
-  const record = users.find((row) => String(row.Email || '').trim().toLowerCase() === email);
-  return {
-    name: record && record.KullaniciAdi || String(e && e.parameter && e.parameter.userName || 'Kullanıcı'),
-    email: email,
-    role: record && record.Rol || 'guest',
-    active: record ? String(record.Aktif).toLowerCase() !== 'false' : Boolean(parameterEmail),
-    source: accountEmail ? 'google-account' : 'integration-parameter'
-  };
-}
-
-function getCurrentUserContext() {
-  return getCurrentUser_({ parameter: {} });
+  return copy;
 }
 
 function searchProducts(query, filters) {
+  ensureSheets();
+  const keyword = normalize_(query);
   const options = filters || {};
-  const keyword = String(query || '').trim();
-  const products = getSheetObjects_(APP_CONFIG.sheets.products)
-    .filter((product) => options.includeAll || isActive_(product.Aktif))
-    .map((product) => ({ product, score: scoreProduct_(product, keyword) }))
-    .filter((item) => !keyword || item.score > 0)
-    .filter((item) => !options.status || String(item.product.Durum) === String(options.status))
-    .filter((item) => !options.location || String(item.product.AnaKonum) === String(options.location))
-    .sort((a, b) => b.score - a.score)
+
+  return getSheetObjects_(APP_CONFIG.sheets.products)
+    .filter((product) => isActive_(product.Aktif))
+    .filter((product) => {
+      if (!keyword) return true;
+      return [product.MastarNo, product.UrunAdi, product.SeriNo, product.Aciklama, product.AnaKonum]
+        .some((value) => normalize_(value).includes(keyword));
+    })
+    .filter((product) => !options.status || String(product.Durum || '') === String(options.status))
+    .filter((product) => !options.location || String(product.AnaKonum || '') === String(options.location))
     .slice(0, 50)
-    .map((item) => ({ ...item.product, AramaSkoru: item.score }));
-  return products;
+    .map(formatProduct_);
 }
 
 function getProductByNo(productNo) {
-  const normalized = normalize_(productNo);
   return getSheetObjects_(APP_CONFIG.sheets.products)
     .map((product, index) => ({ product, rowIndex: index + 2 }))
-    .find((item) => normalize_(item.product.MastarNo) === normalized) || null;
+    .find((item) => String(item.product.MastarNo || '').trim().toLowerCase() === String(productNo || '').trim().toLowerCase()) || null;
 }
 
 function getMovementHistory(productNo) {
   return getSheetObjects_(APP_CONFIG.sheets.movements)
-    .filter((row) => normalize_(row.MastarNo) === normalize_(productNo))
+    .filter((row) => String(row.MastarNo || '').trim().toLowerCase() === String(productNo || '').trim().toLowerCase())
     .sort((a, b) => new Date(b.TarihSaat) - new Date(a.TarihSaat))
-    .slice(0, 100);
+    .slice(0, 50);
+}
+
+function getDefaultReason_(movementType) {
+  const list = DEFAULT_REASON_MAP[String(movementType || 'Al')] || DEFAULT_REASON_MAP.Al;
+  return list[0];
 }
 
 function saveMovement(data) {
@@ -202,32 +223,37 @@ function saveMovement(data) {
 
   const product = record.product;
   const now = new Date();
-  const mainLocation = String(input.newMainLocation || product.AnaKonum || '').trim();
-  const detailLocation = String(input.newDetailLocation || product.DetayKonum || '').trim();
-  const status = String(input.newStatus || product.Durum || '').trim();
-  const movementSheet = getSpreadsheet_().getSheetByName(APP_CONFIG.sheets.movements);
-  const productSheet = getSpreadsheet_().getSheetByName(APP_CONFIG.sheets.products);
+  const movementType = String(input.movementType || 'Al');
+  const typedReason = String(input.description || '').trim();
+  const presetReason = String(input.reasonPreset || '').trim();
+  const description = typedReason || presetReason || getDefaultReason_(movementType);
+  const newMainLocation = String(input.newMainLocation || product.AnaKonum || '').trim();
+  const newDetailLocation = String(input.newDetailLocation || product.DetayKonum || '').trim();
+  const newStatus = String(input.newStatus || product.Durum || '').trim();
+
+  const movementSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(APP_CONFIG.sheets.movements);
+  const productSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(APP_CONFIG.sheets.products);
 
   movementSheet.appendRow([
-    'H-' + Utilities.getUuid().slice(0, 8),
-    now,
-    user.email,
-    user.name,
-    product.MastarNo,
-    product.UrunAdi,
-    String(input.movementType || 'Transfer'),
-    product.AnaKonum || '',
-    product.DetayKonum || '',
-    mainLocation,
-    detailLocation,
-    product.Durum || '',
-    status,
-    String(input.description || '').trim(),
-    String(input.source || 'MastarTakip')
+    Utilities.getUuid(), now, user.email, user.name, product.MastarNo, product.UrunAdi,
+    movementType, product.AnaKonum || '', product.DetayKonum || '',
+    newMainLocation, newDetailLocation, product.Durum || '', newStatus,
+    description, String(input.source || 'MastarTakip')
   ]);
 
-  productSheet.getRange(record.rowIndex, 5, 1, 3).setValues([[mainLocation, detailLocation, status]]);
-  return { success: true, mastarNo: product.MastarNo, newMainLocation: mainLocation, newDetailLocation: detailLocation, newStatus: status };
+  productSheet.getRange(record.rowIndex, 5, 1, 3).setValues([[newMainLocation, newDetailLocation, newStatus]]);
+  productSheet.getRange(record.rowIndex, 13, 1, 2).setValues([[user.name, now]]);
+
+  return {
+    success: true,
+    product: formatProduct_(Object.assign({}, product, {
+      AnaKonum: newMainLocation,
+      DetayKonum: newDetailLocation,
+      Durum: newStatus,
+      Guncelleyen: user.name,
+      GuncellenmeTarihi: now
+    }))
+  };
 }
 
 function getFilterOptions() {
@@ -255,18 +281,11 @@ function getAnalytics() {
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
-  const byMovement = rows.reduce((acc, row) => {
-    const key = row.HareketTuru || 'Belirtilmemiş';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-
   return {
     totalMovements: rows.length,
-    byLocation: byLocation,
-    byUser: byUser,
-    byProduct: byProduct,
-    byMovement: byMovement
+    byLocation,
+    byUser,
+    byProduct
   };
 }
 
