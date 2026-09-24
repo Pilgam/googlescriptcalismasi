@@ -9,87 +9,80 @@
 <body>
   <?!= include('Header'); ?>
   <main class="page-shell">
-    <div class="page-toolbar">
-      <div>
-        <p class="eyebrow">KALİBRASYON</p>
-        <h1>Kalibrasyon Giriş</h1>
-      </div>
-    </div>
-
+    <div class="page-toolbar"><div><p class="eyebrow">KALİBRASYON</p><h1>Kalibrasyon Giriş</h1><p class="muted">Ürünü seçin, kalibrasyon kaydını girin ve ürünün son kalibrasyon bilgisini güncelleyin.</p></div></div>
     <section class="panel">
       <div class="search-line">
-        <input id="productQuery" placeholder="Ürün kodu veya ürün adı" autocomplete="off">
-        <button class="button button-primary" type="button" onclick="loadProductMatch()">Ürün Seç</button>
+        <input id="productQuery" placeholder="Mastar kodu veya ürün adı" autocomplete="off">
+        <button class="button button-primary" type="button" id="findButton">Ürün bul</button>
       </div>
+      <div id="productMatches" style="margin-top:16px"></div>
     </section>
-
-    <section class="panel" id="certificateFormPanel">
-      <div id="selectedProductSummary"></div>
-      <div class="form-grid" style="margin-top:16px;">
-        <label class="field">Mastar No<input id="mastarNo"></label>
+    <section class="panel" id="entryPanel" hidden>
+      <div id="selectedProduct"></div>
+      <div class="form-grid" style="margin-top:16px">
+        <label class="field">Mastar No<input id="mastarNo" readonly></label>
         <label class="field">Sertifika No<input id="certificateNo"></label>
-        <label class="field">Sertifika Türü<select id="certificateType"><option value="Kalibrasyon">Kalibrasyon</option><option value="Uygunluk">Uygunluk</option><option value="Ayrıcalık">Ayrıcalık</option></select></label>
+        <label class="field">Tür<select id="certificateType"><option value="Kalibrasyon">Kalibrasyon</option><option value="Uygunluk">Uygunluk</option></select></label>
         <label class="field">Kurum<input id="organization"></label>
-        <label class="field">Sertifika Tarihi<input id="certificateDate" type="date"></label>
+        <label class="field">Kalibrasyon Tarihi<input id="certificateDate" type="date"></label>
         <label class="field">Geçerlilik Tarihi<input id="validityDate" type="date"></label>
-        <label class="field">Dosya URL<input id="fileUrl"></label>
-        <label class="field">Konum<select id="location"><option>Depo</option><option>Kalite</option><option>Bakım</option><option>Atölye</option></select></label>
-        <label class="field">Atanacak kişi<input id="assignedTo"></label>
-        <label class="field" style="grid-column:1 / -1;">Açıklama<textarea id="description" rows="3"></textarea></label>
+        <label class="field">Konum<select id="location"><option value="Depo">Depo</option><option value="Kalite">Kalite</option><option value="Bakım">Bakım</option><option value="Atölye">Atölye</option></select></label>
+        <label class="field">Atanan kişi<input id="assignedTo"></label>
+        <label class="field" style="grid-column:1/-1">Dosya URL<input id="fileUrl"></label>
+        <label class="field" style="grid-column:1/-1">Açıklama<textarea id="description" rows="3"></textarea></label>
       </div>
-      <div class="save-row">
-        <button class="button button-primary" type="button" onclick="saveCertificateEntry()">Kalibrasyon Kaydet</button>
-      </div>
-      <p id="certificateMessage" class="form-message"></p>
+      <div class="save-row"><button class="button button-primary" type="button" id="saveButton">Kalibrasyonu kaydet</button></div>
+      <p id="message" class="form-message"></p>
     </section>
   </main>
-
   <script>window.APP_CONTEXT = <?= userContext ?>;</script>
   <script>
-    function loadProductMatch() {
-      const q = document.getElementById('productQuery').value.trim();
-      if (!q) {
-        document.getElementById('selectedProductSummary').innerHTML = '<p class="muted">Ürün seçmek için arama yapın.</p>';
-        return;
-      }
-      google.script.run.withSuccessHandler((rows) => {
-        const result = rows && rows[0];
-        if (!result) {
-          document.getElementById('selectedProductSummary').innerHTML = '<p class="muted">Ürün bulunamadı.</p>';
-          return;
-        }
-        document.getElementById('mastarNo').value = result.MastarNo;
-        document.getElementById('selectedProductSummary').innerHTML = '<div class="info-box"><strong>' + safe(result.UrunAdi) + '</strong><span>' + safe(result.MastarNo) + ' · ' + safe(result.AnaKonum || 'Depo') + ' / ' + safe(result.DetayKonum || '-') + '</span></div>';
-      }).searchProducts(q, { includeAll: true });
+    const $ = id => document.getElementById(id);
+    $('findButton').addEventListener('click', findProducts);
+    $('productQuery').addEventListener('keydown', e => { if (e.key === 'Enter') findProducts(); });
+    $('saveButton').addEventListener('click', saveEntry);
+
+    function findProducts() {
+      const query = $('productQuery').value.trim();
+      if (!query) return show('Ürün kodu veya adı yazın.', 'error');
+      google.script.run.withSuccessHandler(renderMatches).withFailureHandler(error => show(error.message, 'error')).searchProducts(query, { includeAll: true });
     }
 
-    function saveCertificateEntry() {
+    function renderMatches(rows) {
+      $('productMatches').innerHTML = rows && rows.length ? rows.map((row, index) =>
+        '<button class="result-card" type="button" data-index="' + index + '"><span class="code">' + safe(row.MastarNo) + '</span><strong>' + safe(row.UrunAdi) + '</strong><small>' + safe(row.SeriNo) + ' · ' + safe(row.AnaKonum || 'Depo') + '</small></button>'
+      ).join('') : '<p class="muted">Ürün bulunamadı.</p>';
+      Array.from(document.querySelectorAll('#productMatches [data-index]')).forEach(button => button.addEventListener('click', () => selectProduct(rows[Number(button.dataset.index)])));
+    }
+
+    function selectProduct(product) {
+      $('entryPanel').hidden = false;
+      $('mastarNo').value = product.MastarNo || '';
+      $('assignedTo').value = (window.APP_CONTEXT && window.APP_CONTEXT.name) || '';
+      $('selectedProduct').innerHTML = '<div class="info-box"><strong>' + safe(product.UrunAdi) + '</strong><span>' + safe(product.MastarNo) + ' · Son kalibrasyon: ' + safe(product.SonKontrolTarihi || 'Kayıt yok') + ' · Konum: ' + safe(product.AnaKonum || 'Depo') + '</span></div>';
+      $('entryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function saveEntry() {
       const payload = {
-        mastarNo: document.getElementById('mastarNo').value,
-        certificateNo: document.getElementById('certificateNo').value,
-        certificateType: document.getElementById('certificateType').value,
-        organization: document.getElementById('organization').value,
-        certificateDate: document.getElementById('certificateDate').value,
-        validityDate: document.getElementById('validityDate').value,
-        fileUrl: document.getElementById('fileUrl').value,
-        description: document.getElementById('description').value,
-        assignedTo: document.getElementById('assignedTo').value,
-        userEmail: window.APP_CONTEXT.email,
-        userName: window.APP_CONTEXT.name,
+        mastarNo: $('mastarNo').value,
+        certificateNo: $('certificateNo').value,
+        certificateType: $('certificateType').value,
+        organization: $('organization').value,
+        certificateDate: $('certificateDate').value,
+        validityDate: $('validityDate').value,
+        fileUrl: $('fileUrl').value,
+        description: $('description').value,
+        assignedTo: $('assignedTo').value || ((window.APP_CONTEXT || {}).name || ''),
+        userEmail: (window.APP_CONTEXT || {}).email || '',
+        userName: (window.APP_CONTEXT || {}).name || '',
         source: 'KalibrasyonGiris'
       };
-      google.script.run.withSuccessHandler(() => {
-        document.getElementById('certificateMessage').textContent = 'Kalibrasyon kaydı eklendi.';
-        document.getElementById('certificateMessage').className = 'form-message success';
-      }).withFailureHandler((error) => {
-        document.getElementById('certificateMessage').textContent = error.message || 'Kayıt başarısız.';
-        document.getElementById('certificateMessage').className = 'form-message error';
-      }).saveCertificate(payload);
+      google.script.run.withSuccessHandler(() => show('Kalibrasyon kaydı eklendi.', 'success')).withFailureHandler(error => show(error.message || 'Kayıt başarısız.', 'error')).saveCertificate(payload);
     }
 
-    function safe(value) {
-      return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]; });
-    }
+    function show(text, type) { $('message').textContent = text; $('message').className = 'form-message ' + type; }
+    function safe(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
   </script>
 </body>
 </html>
