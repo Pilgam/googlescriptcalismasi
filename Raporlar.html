@@ -1,74 +1,30 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <base target="_top">
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <?!= include('Styles'); ?>
-</head>
+<head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><?!= include('Styles'); ?></head>
 <body>
   <?!= include('Header'); ?>
   <main class="page-shell">
-    <div class="page-toolbar">
-      <div>
-        <p class="eyebrow">ANALİZ</p>
-        <h1>İstatistikler</h1>
-      </div>
-      <a class="button button-secondary" href="?page=Index">Hızlı işlem</a>
-    </div>
-
-    <section class="stat-grid">
-      <div class="stat-card"><strong id="totalMovements">-</strong><span>toplam hareket</span></div>
-      <div class="stat-card"><strong id="distinctLocations">-</strong><span>konum sayısı</span></div>
-      <div class="stat-card"><strong id="distinctUsers">-</strong><span>işlem yapan kişi</span></div>
+    <div class="page-toolbar"><div><p class="eyebrow">ANALİZ</p><h1>İstatistikler</h1><p class="muted">Hareket ve kalibrasyon durumunu tek ekranda özetler.</p></div><a class="button button-secondary" href="?page=Index">Hızlı işlem</a></div>
+    <section class="stat-grid"><div class="stat-card"><strong id="totalMovements">-</strong><span>toplam hareket</span></div><div class="stat-card"><strong id="distinctLocations">-</strong><span>konum sayısı</span></div><div class="stat-card"><strong id="distinctUsers">-</strong><span>işlem yapan kişi</span></div><div class="stat-card"><strong id="certificateAlertCount">-</strong><span>sertifika uyarısı</span></div></section>
+    <section class="analytics-grid">
+      <div class="panel"><h2>Kalibrasyon durumu</h2><div class="pie-layout"><div id="certificatePie" class="pie-chart"></div><div id="certificateLegend" class="chart-legend"></div></div></div>
+      <div class="panel"><h2>Hareket türleri</h2><div id="byMovement"></div></div>
     </section>
-
-    <section class="panel">
-      <h2>Nerede daha çok kullanılmış?</h2>
-      <div id="byLocation"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Kim daha çok işlem yapmış?</h2>
-      <div id="byUser"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Hangi mastar daha çok hareket görmüş?</h2>
-      <div id="byProduct"></div>
-    </section>
+    <section class="panel"><h2>Nerede daha çok kullanılmış?</h2><div id="byLocation"></div></section>
+    <section class="panel"><h2>Kim daha çok işlem yapmış?</h2><div id="byUser"></div></section>
+    <section class="panel"><h2>Hangi mastar daha çok hareket görmüş?</h2><div id="byProduct"></div></section>
   </main>
-
   <script>window.APP_CONTEXT = <?= userContext ?>;</script>
   <script>
-    google.script.run.withSuccessHandler(function (data) {
-      document.getElementById('totalMovements').textContent = data.totalMovements;
-      document.getElementById('distinctLocations').textContent = Object.keys(data.byLocation || {}).length;
-      document.getElementById('distinctUsers').textContent = Object.keys(data.byUser || {}).length;
-      renderBarChart('byLocation', data.byLocation);
-      renderBarChart('byUser', data.byUser);
-      renderBarChart('byProduct', data.byProduct);
-    }).getAnalytics();
-
-    function renderBarChart(id, object) {
-      const rows = Object.entries(object || {}).sort(function (a, b) { return b[1] - a[1]; });
-      const max = Math.max(1, ...rows.map(function (row) { return row[1]; }));
-      const el = document.getElementById(id);
-      if (!rows.length) {
-        el.innerHTML = '<p class="muted">Veri yok.</p>';
-        return;
-      }
-      el.innerHTML = '<table class="data-table"><thead><tr><th>Değer</th><th>Adet</th><th>Dağılım</th></tr></thead><tbody>' + rows.map(function (row) {
-        const width = Math.max(8, (row[1] / max) * 100);
-        return '<tr><td>' + safe(row[0]) + '</td><td>' + row[1] + '</td><td><div class="bar"><i style="width:' + width + '%"></i></div></td></tr>';
-      }).join('') + '</tbody></table>';
-    }
-
-    function safe(value) {
-      return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
-        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
-      });
-    }
+    document.addEventListener('DOMContentLoaded', function () {
+      google.script.run.withSuccessHandler(renderAnalytics).withFailureHandler(showError).getAnalytics();
+      google.script.run.withSuccessHandler(renderCertificates).withFailureHandler(showError).getCertificateSummary();
+    });
+    function renderAnalytics(data) { document.getElementById('totalMovements').textContent = data.totalMovements || 0; document.getElementById('distinctLocations').textContent = Object.keys(data.byLocation || {}).length; document.getElementById('distinctUsers').textContent = Object.keys(data.byUser || {}).length; renderBars('byLocation', data.byLocation); renderBars('byUser', data.byUser); renderBars('byProduct', data.byProduct); renderBars('byMovement', data.byMovement); }
+    function renderCertificates(data) { const values = [Number(data.valid || 0), Number(data.expiringSoon || 0), Number(data.expired || 0), Number(data.noDate || 0)]; const labels = ['Geçerli', '60 Gün İçinde', 'Süresi Dolmuş', 'Tarih Yok']; const colors = ['#16a34a', '#f59e0b', '#dc2626', '#94a3b8']; document.getElementById('certificateAlertCount').textContent = values[1] + values[2]; const total = values.reduce((sum, value) => sum + value, 0) || 1; let start = 0; const segments = values.map((value, index) => { const end = start + value / total * 360; const segment = colors[index] + ' ' + start + 'deg ' + end + 'deg'; start = end; return segment; }); document.getElementById('certificatePie').style.background = 'conic-gradient(' + segments.join(',') + ')'; document.getElementById('certificateLegend').innerHTML = labels.map((label, index) => '<span><i style="background:' + colors[index] + '"></i>' + label + ' (' + values[index] + ')</span>').join(''); }
+    function renderBars(id, object) { const rows = Object.entries(object || {}).sort((a, b) => b[1] - a[1]); const max = Math.max(1, ...rows.map((row) => row[1])); const el = document.getElementById(id); if (!rows.length) { el.innerHTML = '<p class="muted">Veri yok.</p>'; return; } el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Değer</th><th>Adet</th><th>Dağılım</th></tr></thead><tbody>' + rows.map((row) => '<tr><td>' + safe(row[0]) + '</td><td>' + row[1] + '</td><td><div class="bar"><i style="width:' + Math.max(8, row[1] / max * 100) + '%"></i></div></td></tr>').join('') + '</tbody></table></div>'; }
+    function showError(error) { document.body.insertAdjacentHTML('beforeend', '<p class="form-message error">' + safe(error.message || 'Veri yüklenemedi.') + '</p>'); }
+    function safe(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   </script>
 </body>
 </html>
