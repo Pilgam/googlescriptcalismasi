@@ -1,86 +1,139 @@
-# Google Apps Script - Mastar Takip başlangıç yapısı
+# CLAUDE_CONTEXT
 
-Bu repository, Claude tarafından hazırlanmış ana menüye daha sonra bağlanabilecek sade bir Google Apps Script modülüdür.
+APP:
+- Google Apps Script web app
+- pages: Index, MasterTakip
+- user context: Google Session email or userEmail param
+- spreadsheet source: active spreadsheet
+- module scope: mastar takibi + sertifika/kalibrasyon takibi
 
-## Dosya yapısı
+SHEETS:
 
-- `Code.gs`: sayfa yönlendirme, sheet kurulumu, kullanıcı bağlamı, arama ve hareket servisleri
-- `Index.html`: modül ana menüsü
-- `MasterTakip.html`: arama, detay, hareket kaydı ve hareket geçmişi
-- `Header.html`: ortak üst başlık ve kullanıcı bilgisi
-- `Styles.html`: ortak arayüz stilleri
-- `appsscript.json`: Apps Script çalışma ayarları
+Urunler
+- MastarNo
+- UrunAdi
+- SeriNo
+- Aciklama
+- AnaKonum
+- DetayKonum
+- Durum
+- SorumluKisi
+- Aktif
 
-## İlk çalıştırma
+Sertifikalar
+- SertifikaId
+- MastarNo
+- SertifikaNo
+- SertifikaTuru
+- Kurum
+- SertifikaTarihi
+- GecerlilikTarihi
+- DosyaUrl
+- Durum
+- Aciklama
+- Aktif
+- Ekleyen
+- GuncellenmeTarihi
 
-1. Bu repository dosyalarını Google Apps Script projesine kopyalayın veya clasp ile bağlayın.
-2. Proje bir Google Spreadsheet'e bağlı olmalıdır (`SpreadsheetApp.getActiveSpreadsheet()`).
-3. `doGet` fonksiyonunu ilk kez çalıştırın veya Web App olarak deploy edin.
-4. İlk açılışta şu sheet'ler otomatik oluşur:
-   - `Urunler`
-   - `Hareketler`
-   - `Kullanicilar`
-5. Boş sheet'lere örnek kayıtlar otomatik eklenir.
+Hareketler
+- HareketId
+- TarihSaat
+- KullaniciEmail
+- KullaniciAdi
+- MastarNo
+- MastarAdi
+- HareketTuru
+- EskiAnaKonum
+- EskiDetayKonum
+- YeniAnaKonum
+- YeniDetayKonum
+- EskiDurum
+- YeniDurum
+- Aciklama
+- Kaynak
 
-## Claude entegrasyon sözleşmesi
+Kullanicilar
+- KullaniciAdi
+- Email
+- Rol
+- Aktif
 
-Ana uygulama Mastar Takip modülünü şu URL formatı ile açabilir:
+EXAMPLE_DATA
 
-```text
-WEB_APP_URL?page=MasterTakip
-```
+Urunler
+| MastarNo | UrunAdi | SeriNo | Aciklama | AnaKonum | DetayKonum | Durum | SorumluKisi | Aktif |
+| M-1001 | Olcum Mastari | SN-001 | Dıs cap kontrol | Depo-1 | Raf-A1 / Goz-01 | Hazir | Ahmet Yilmaz | TRUE |
+| M-1002 | Derinlik Mastari | SN-002 | Olcum cihazı | Kalite | Dolap-2 / Goz-03 | Kullanimda | Ayse Demir | TRUE |
+| M-1003 | Vida Mastari | SN-003 | Vida kontrol | Bakim | Atolye / Tezgah-04 | Bakimda |  | TRUE |
 
-İlk entegrasyon için opsiyonel bağlam parametreleri de desteklenir:
+Sertifikalar
+| SertifikaId | MastarNo | SertifikaNo | SertifikaTuru | Kurum | SertifikaTarihi | GecerlilikTarihi | Durum | Aciklama |
+| S-001 | M-1001 | KAL-2026-001 | Kalibrasyon | ABC Kalibrasyon | 2026-09-01 | 2027-09-01 | Gecerli | Yillik kalibrasyon |
+| S-002 | M-1001 | UYG-2026-023 | Uygunluk | ISO Lab | 2026-09-15 | 2026-12-15 | 60 Gun Icind e | Yillik uygunluk |
+| S-003 | M-1002 | KAL-2026-007 | Kalibrasyon | XYZ Lab | 2026-08-10 | 2026-09-20 | Sure Dolmus | Gecerlilik bitti |
 
-```text
-WEB_APP_URL?page=MasterTakip&userEmail=user@example.com&userName=Kullanıcı
-```
+Kullanicilar
+| KullaniciAdi | Email | Rol | Aktif |
+| Yonetici | admin@example.com | admin | TRUE |
+| Operator | operator@example.com | operator | TRUE |
 
-`userEmail` ve `userName` entegrasyon kolaylığı içindir. Yetki kararı yalnızca URL parametresine göre verilmez; `Kullanicilar` sheet'inde aynı e-posta ile aktif kullanıcı bulunması gerekir.
+STATUS_LOGIC
+- Geçerli: 60 gun ustu
+- 60 Gun Icind e: 0-60 gun arasi
+- Sure Dolmus: gecerlilik tarihi gecmis
+- Tarih Yok: tarih yok
 
-### Beklenen `Kullanicilar` kolonları
+FILTERS
+- mastarNo
+- productName
+- serialNo
+- certificateType
+- organization
+- status
+- expiringSoon
+- dateFrom
+- dateTo
 
-```text
-KullaniciAdi | Email | Rol | Aktif
-```
+REQUIRED FUNCTIONS
+- getCertificates(filters)
+- getCertificateFilterOptions()
+- getCertificateSummary()
+- saveCertificate(data)
+- getProductByNo(mastarNo)
+- searchProducts(query, filters)
+- getMovementHistory(mastarNo)
+- saveMovement(data)
+- getCurrentUserContext()
 
-Desteklenen roller:
-
-- `admin`: tüm işlemler
-- `operator`: arama ve hareket kaydı
-- diğer roller: salt görüntüleme / işlem kısıtlı
-
-### Claude'un okuyup kullanabileceği fonksiyonlar
-
-- `searchProducts(query, filters)`
-- `getProductByNo(productNo)`
-- `getMovementHistory(mastarNo)`
-- `saveMovement(data)`
-- `getCurrentUserContext()`
-- `getFilterOptions()`
-
-`saveMovement` veri örneği:
-
-```javascript
+SAVE_CERTIFICATE_INPUT
 {
   mastarNo: 'M-1001',
-  movementType: 'Transfer',
-  newMainLocation: 'Depo-1',
-  newDetailLocation: 'Raf-A2 / Göz-03',
-  newStatus: 'Hazır',
-  description: 'Örnek hareket',
-  userEmail: 'user@example.com',
-  userName: 'Kullanıcı',
-  source: 'ClaudeMainMenu'
+  certificateNo: 'KAL-2026-001',
+  certificateType: 'Kalibrasyon',
+  organization: 'ABC Kalibrasyon',
+  certificateDate: '2026-09-01',
+  validityDate: '2027-09-01',
+  fileUrl: 'https://drive.google.com/..',
+  description: 'Yillik kalibrasyon',
+  userEmail: 'admin@example.com',
+  userName: 'Yonetici',
+  source: 'MastarTakip'
 }
-```
 
-## Veri modeli
+UI_BEHAVIOR
+- search products by mastar no, product name, serial no, description
+- select product -> detail panel
+- show certificate list for product
+- add certificate form
+- show warning badge when certificate is expiring within 60 days
+- show red warning when expired
+- filters should support status and certificate type
 
-`Urunler` güncel durumu tutar. `Hareketler` değişiklik öncesi ve sonrası bilgileri tutan değişmez geçmiş tablosudur. Ürün konumu güncellenirken önce hareket kaydı oluşturulur.
+PAGE_ROUTING
+- ?page=Index => ana menu
+- ?page=MasterTakip => mastar takibi
 
-Gerçek kullanıcı sheet'i ve gerçek kolonlar geldiğinde yalnızca `APP_CONFIG`, header listeleri ve seed fonksiyonları güncellenmelidir.
-
-## Not
-
-`appsscript.json` içindeki `ANYONE` erişimi prototip içindir. Gerçek kullanıma alınmadan önce Web App erişimi kurumun Google hesaplarıyla sınırlandırılmalıdır.
+AUTH_RULES
+- user email resolved from Session.getActiveUser().getEmail() or userEmail query param
+- role check before save: admin/operator allowed
+- sheet-based user record is source of truth
