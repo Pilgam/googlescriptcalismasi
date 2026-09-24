@@ -1,51 +1,13 @@
 <!DOCTYPE html>
-<html>
-<head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><?!= include('Styles'); ?></head>
-<body>
-<?!= include('Header'); ?>
-<main class="page-shell">
-  <div class="page-toolbar"><div><p class="eyebrow">KALİBRASYON</p><h1>Kalibrasyon Giriş</h1><p class="muted">Ürün seçin ve yeni kalibrasyon kaydını girin.</p></div></div>
-  <section class="panel"><div class="search-line"><input id="productQuery" placeholder="Mastar kodu veya ürün adı" autocomplete="off"><button class="button button-primary" id="findButton" type="button">Ürün bul</button></div><div id="matches"></div></section>
-  <section class="panel" id="entryPanel" hidden><div id="selectedProduct"></div><div class="form-grid">
-    <label class="field">Mastar No<input id="mastarNo" readonly></label><label class="field">Sertifika No<input id="certificateNo"></label>
-    <label class="field">Tür<select id="certificateType"><option value="Kalibrasyon">Kalibrasyon</option><option value="Uygunluk">Uygunluk</option></select></label><label class="field">Kurum<input id="organization"></label>
-    <label class="field">Kalibrasyon tarihi<input id="certificateDate" type="date"></label><label class="field">Geçerlilik tarihi<input id="validityDate" type="date"></label>
-    <label class="field">Konum<select id="location"><option>Depo</option><option>Kalite</option><option>Bakım</option><option>Atölye</option></select></label>
-    <label class="field">Atanan kişi<input id="assignedTo"></label><label class="field" style="grid-column:1/-1">Dosya URL<input id="fileUrl"></label>
-    <label class="field" style="grid-column:1/-1">Açıklama<textarea id="description" rows="3"></textarea></label>
-  </div><div class="save-row"><button class="button button-primary" id="saveButton" type="button">Kaydet</button></div><p id="message" class="form-message"></p></section>
-</main>
-<script>window.APP_CONTEXT = <?= userContext ?>;</script>
-<script>
-/* CLAUDE CALIBRATION NOTE: product selection is mandatory; assignedTo defaults to the current APP_CONTEXT user; no external user integration. */
-(function () {
-  var $ = function (id) { return document.getElementById(id); };
-  $('findButton').addEventListener('click', findProducts);
-  $('productQuery').addEventListener('keydown', function (event) { if (event.key === 'Enter') findProducts(); });
-  $('saveButton').addEventListener('click', saveEntry);
-  function findProducts() {
-    var query = $('productQuery').value.trim();
-    if (!query) return message('Ürün kodu veya adı girin.', 'error');
-    google.script.run.withSuccessHandler(renderMatches).withFailureHandler(function (error) { message(error.message, 'error'); }).searchProducts(query, { includeAll: true });
-  }
-  function renderMatches(rows) {
-    rows = rows || [];
-    $('matches').innerHTML = rows.length ? rows.map(function (row, index) { return '<button class="result-card" type="button" data-index="' + index + '"><span class="code">' + safe(row.MastarNo) + '</span><strong>' + safe(row.UrunAdi) + '</strong><small>' + safe(row.SeriNo) + ' · ' + safe(row.AnaKonum || 'Depo') + '</small></button>'; }).join('') : '<p class="muted">Ürün bulunamadı.</p>';
-    Array.prototype.forEach.call(document.querySelectorAll('#matches [data-index]'), function (button) { button.addEventListener('click', function () { selectProduct(rows[Number(button.dataset.index)]); }); });
-  }
-  function selectProduct(product) {
-    $('entryPanel').hidden = false; $('mastarNo').value = product.MastarNo || ''; $('assignedTo').value = (window.APP_CONTEXT || {}).name || '';
-    $('selectedProduct').innerHTML = '<div class="info-box"><strong>' + safe(product.UrunAdi) + '</strong><span>' + safe(product.MastarNo) + ' · Son kalibrasyon: ' + safe(product.SonKontrolTarihi || 'Kayıt yok') + ' · Konum: ' + safe(product.AnaKonum || 'Depo') + '</span></div>';
-    $('entryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  function saveEntry() {
-    var context = window.APP_CONTEXT || {};
-    var payload = { mastarNo: $('mastarNo').value, certificateNo: $('certificateNo').value, certificateType: $('certificateType').value, organization: $('organization').value, certificateDate: $('certificateDate').value, validityDate: $('validityDate').value, fileUrl: $('fileUrl').value, description: $('description').value, assignedTo: $('assignedTo').value || context.name || '', userEmail: context.email || '', userName: context.name || '', source: 'KalibrasyonGiris' };
-    google.script.run.withSuccessHandler(function () { message('Kalibrasyon kaydedildi.', 'success'); }).withFailureHandler(function (error) { message(error.message || 'Kayıt başarısız.', 'error'); }).saveCertificate(payload);
-  }
-  function message(text, type) { var node = $('message'); node.textContent = text; node.className = 'form-message ' + type; }
-  function safe(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-}());
-</script>
-</body>
-</html>
+<html><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><?!= include('Styles'); ?></head><body>
+<?!= include('Header'); ?><main class="page-shell"><div class="page-toolbar"><div><p class="eyebrow">KALİBRASYON</p><h1>Kalibrasyon Giriş</h1><p class="muted">Teknisyen kaydı oluşturur; kalite yetkilisi daha sonra kabul veya ret kararı verir.</p></div></div>
+<section class="panel"><div class="search-line"><input id="query" placeholder="Mastar kodu veya ürün adı" autocomplete="off"><button class="button button-primary" id="find" type="button">Ürün bul</button></div><div id="matches"></div></section>
+<section class="panel" id="formPanel" hidden><div id="selected"></div><div class="form-grid">
+<label class="field">Mastar No<input id="mastarNo" readonly></label><label class="field">Sertifika No<input id="certificateNo"></label><label class="field">Tür<select id="certificateType"><option value="Kalibrasyon">Kalibrasyon</option><option value="Uygunluk">Uygunluk</option></select></label><label class="field">Kurum<input id="organization"></label>
+<label class="field">Kalibrasyon tarihi<input id="certificateDate" type="date"></label><label class="field">Geçerlilik tarihi<input id="validityDate" type="date" required></label><label class="field">Konum<select id="location"><option>Depo</option><option>Kalite</option><option>Bakım</option><option>Atölye</option></select></label><label class="field">Atanan kişi<input id="assignedTo"></label>
+<label class="field">Kabul nedeni<select id="acceptanceReason"></select></label><label class="field">Standart<select id="standard"></select></label><label class="field" style="grid-column:1/-1">Dosya URL<input id="fileUrl"></label><label class="field" style="grid-column:1/-1">Açıklama<textarea id="description" rows="3"></textarea></label>
+</div><div class="save-row"><button class="button button-primary" id="save" type="button">Kalibrasyonu gönder</button></div><p id="message" class="form-message"></p></section></main>
+<script>window.APP_CONTEXT=<?= userContext ?>;</script><script>
+/* CLAUDE CALIBRATION NOTE: required reason and standard create a pending quality acceptance; do not call saveCertificate directly for this screen. */
+(function(){var $=function(id){return document.getElementById(id);};function message(t,c){$('message').textContent=t;$('message').className='form-message '+c;}function safe(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}function find(){var q=$('query').value.trim();if(!q)return message('Ürün kodu veya adı girin.','error');$('find').disabled=true;google.script.run.withSuccessHandler(render).withFailureHandler(function(e){$('find').disabled=false;message(e.message,'error');}).searchProducts(q,{includeAll:true});}function render(rows){$('find').disabled=false;rows=rows||[];$('matches').innerHTML=rows.length?rows.map(function(p,i){return '<button type="button" class="result-card" data-index="'+i+'"><span class="code">'+safe(p.MastarNo)+'</span><strong>'+safe(p.UrunAdi)+'</strong><small>'+safe(p.SeriNo)+' · '+safe(p.AnaKonum||'Depo')+'</small></button>';}).join(''):'<p class="muted">Ürün bulunamadı.</p>';Array.prototype.forEach.call(document.querySelectorAll('#matches [data-index]'),function(b){b.onclick=function(){var p=rows[Number(b.dataset.index)];$('formPanel').hidden=false;$('mastarNo').value=p.MastarNo||'';$('assignedTo').value=(window.APP_CONTEXT||{}).name||'';$('selected').innerHTML='<div class="info-box"><strong>'+safe(p.UrunAdi)+'</strong><span>'+safe(p.MastarNo)+' · Son kalibrasyon: '+safe(p.SonKontrolTarihi||'Kayıt yok')+'</span></div>';$('formPanel').scrollIntoView({behavior:'smooth',block:'start'});};});}function loadOptions(){google.script.run.withSuccessHandler(function(o){$('acceptanceReason').innerHTML=o.reasons.map(function(x){return '<option>'+safe(x)+'</option>';}).join('');$('standard').innerHTML=o.standards.map(function(x){return '<option>'+safe(x)+'</option>';}).join('');}).withFailureHandler(function(e){message(e.message,'error');}).getAcceptanceOptions();}function save(){var c=window.APP_CONTEXT||{};var payload={mastarNo:$('mastarNo').value,certificateNo:$('certificateNo').value,certificateType:$('certificateType').value,organization:$('organization').value,certificateDate:$('certificateDate').value,validityDate:$('validity').value,fileUrl:$('fileUrl').value,description:$('description').value,assignedTo:$('assignedTo').value||c.name||'',acceptanceReason:$('acceptanceReason').value,standard:$('standard').value,userEmail:c.email||'',userName:c.name||''};$('save').disabled=true;google.script.run.withSuccessHandler(function(r){$('save').disabled=false;message('Kayıt gönderildi. Kalite onayı bekleniyor: '+r.acceptanceId,'success');}).withFailureHandler(function(e){$('save').disabled=false;message(e.message||'Kayıt başarısız.','error');}).saveCalibrationWithAcceptance(payload);} $('find').onclick=find;$('query').onkeydown=function(e){if(e.key==='Enter')find();};$('save').onclick=save;loadOptions();}());
+</script></body></html>

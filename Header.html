@@ -1,25 +1,18 @@
 <!--
 CLAUDE UI NOTE
-Navigation must leave the current Apps Script iframe and open the web-app route
-in the top window. Without target="_top", repeated page navigation can create
-nested panels and appear frozen. Keep these routes on the deployed /exec URL.
+Use target="_top" so Apps Script does not nest the next web-app page inside the current iframe.
+The small click handler gives immediate visual feedback and prevents duplicate navigation clicks.
 -->
 <header class="app-header">
-  <a class="brand" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
+  <a class="brand nav-link" target="_top" data-route="Index" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
   <nav>
-    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index">Hızlı işlem</a>
-    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=MasterTakip">Liste</a>
-    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Sertifikalar">Kalibrasyon Giriş</a>
-    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Raporlar">İstatistik</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="Index" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index">Hızlı işlem</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="MasterTakip" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=MasterTakip">Liste</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="Sertifikalar" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Sertifikalar">Kalibrasyon Giriş</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="Raporlar" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Raporlar">İstatistik</a>
   </nav>
   <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
 </header>
 <script>
-(function () {
-  var context = window.APP_CONTEXT || {};
-  var name = document.getElementById('headerUserName');
-  var role = document.getElementById('headerUserRole');
-  if (name) name.textContent = context.name || 'Kullanıcı';
-  if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
-}());
+(function(){var context=window.APP_CONTEXT||{};var name=document.getElementById('headerUserName');var role=document.getElementById('headerUserRole');if(name)name.textContent=context.name||'Kullanıcı';if(role)role.textContent=context.role&&context.role!=='guest'?'('+context.role+')':'';Array.prototype.forEach.call(document.querySelectorAll('.nav-link'),function(link){link.addEventListener('click',function(){link.classList.add('is-loading');link.setAttribute('aria-busy','true');});});}());
 </script>
