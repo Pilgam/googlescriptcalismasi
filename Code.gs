@@ -45,7 +45,7 @@ function doGet(e) {
   const page = normalizePage_(e && e.parameter && e.parameter.page);
   const template = HtmlService.createTemplateFromFile(page);
   template.pageTitle = page === APP_CONFIG.pages.home ? 'Ana Menü' : page;
-  template.userContext = JSON.stringify(getCurrentUser_(e)).replace(/</g, '\\u003c');
+  template.userContext = JSON.stringify(getCurrentUser_(e)).replace(/</g, '\u003c');
 
   return template.evaluate()
     .setTitle(APP_CONFIG.appName)
@@ -243,6 +243,7 @@ function getAnalytics() {
   }, {});
   return {
     totalMovements: rows.length,
+    byMovement: countBy('HareketTuru'),
     byLocation: countBy('YeniAnaKonum'),
     byUser: countBy('KullaniciAdi'),
     byProduct: countBy('MastarNo')
