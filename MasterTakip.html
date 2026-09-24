@@ -14,14 +14,13 @@
         <p class="eyebrow">LİSTE</p>
         <h1>Mastar listesi</h1>
       </div>
-      <a class="button button-secondary" href="?page=Index">Hızlı işlem</a>
     </div>
 
     <section class="panel">
       <div class="search-line">
         <input id="listSearch" placeholder="Mastar adı veya kodu yazın" autocomplete="off">
         <label class="check-box"><input id="listIncludeAll" type="checkbox"> Pasifler dahil</label>
-        <button class="button button-primary" onclick="runListSearch()">Ara</button>
+        <button class="button button-primary" type="button" onclick="runListSearch()">Ara</button>
       </div>
     </section>
 
@@ -45,15 +44,15 @@
           el.innerHTML = '<p class="muted">Kayıt bulunamadı.</p>';
           return;
         }
-        el.innerHTML = '<table class="data-table"><thead><tr><th>Mastar</th><th>Ürün</th><th>Seri</th><th>Konum</th><th>Durum</th><th>Kimde</th></tr></thead><tbody>' + rows.map(function (row) {
-          return '<tr><td>' + safe(row.MastarNo) + '</td><td>' + safe(row.UrunAdi) + '</td><td>' + safe(row.SeriNo) + '</td><td>' + safe(row.AnaKonum) + ' / ' + safe(row.DetayKonum) + '</td><td>' + safe(row.Durum) + '</td><td>' + safe(row.SorumluKisi || '-') + '</td></tr>';
+        el.innerHTML = '<table class="data-table"><thead><tr><th>Mastar</th><th>Ürün</th><th>Seri</th><th>Konum</th><th>Son kalibrasyon</th><th>Durum</th><th>Kimde</th></tr></thead><tbody>' + rows.map(function (row) {
+          return '<tr><td>' + safe(row.MastarNo) + '</td><td>' + safe(row.UrunAdi) + '</td><td>' + safe(row.SeriNo) + '</td><td>' + safe(row.AnaKonum) + ' / ' + safe(row.DetayKonum) + '</td><td>' + safe(row.SonKontrolTarihi || '-') + '</td><td>' + safe(row.Durum || '-') + '</td><td>' + safe(row.SorumluKisi || '-') + '</td></tr>';
         }).join('') + '</tbody></table>';
       }).searchProducts(query, { includeAll: includeAll });
     }
 
     function safe(value) {
       return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
-        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char];
       });
     }
   </script>
