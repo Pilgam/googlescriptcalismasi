@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <?!= include('Header'); ?>
+  <main class="page-shell">
+    <div class="page-toolbar"><div><p class="eyebrow">KALİBRASYON</p><h1>Sertifikalar</h1><p class="muted">Geçerlilik tarihi, kalan süre ve uyarıları tek ekranda takip edin.</p></div><a class="button button-secondary" href="?page=Index">Hızlı işlem</a></div>
+    <section class="stat-grid certificate-stats"><div class="stat-card"><strong id="total">-</strong><span>toplam</span></div><div class="stat-card stat-valid"><strong id="valid">-</strong><span>geçerli</span></div><div class="stat-card stat-warning"><strong id="soon">-</strong><span>60 gün içinde</span></div><div class="stat-card stat-danger"><strong id="expired">-</strong><span>süresi dolmuş</span></div></section>
+    <section class="calibration-grid">
+      <div class="panel chart-panel"><h2>Durum dağılımı</h2><div id="pie" class="pie-chart"></div><div id="legend" class="chart-legend"></div></div>
+      <div class="panel"><h2>Filtrele</h2><div class="filter-grid"><label class="field">Arama<input id="query" placeholder="Mastar, sertifika, kurum"></label><label class="field">Tür<select id="type"><option value="">Tümü</option></select></label><label class="field">Durum<select id="status"><option value="">Tümü</option></select></label><label class="field check-field"><input id="soonOnly" type="checkbox"> Sadece 60 gün içinde</label></div><button class="button button-primary" onclick="loadCertificates()">Filtrele</button><button class="button button-secondary" onclick="clearFilters()">Temizle</button></div>
+    </section>
+    <section class="panel"><div class="section-head"><h2>Sertifika tablosu</h2><span id="count" class="muted"></span></div><div id="table"></div></section>
+  </main>
+  <script>window.APP_CONTEXT = <?= userContext ?>;</script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () { loadOptions(); loadSummary(); loadCertificates(); });
+    function loadOptions() { google.script.run.withSuccessHandler(function (data) { fill('type', data.types); fill('status', data.statuses); }).getCertificateFilterOptions(); }
+    function fill(id, values) { values.forEach(function (value) { var option = document.createElement('option'); option.value = value; option.textContent = value; document.getElementById(id).appendChild(option); }); }
+    function loadSummary() { google.script.run.withSuccessHandler(function (data) { ['total','valid','soon','expired'].forEach(function (key) { document.getElementById(key).textContent = data[key === 'soon' ? 'expiringSoon' : key]; }); renderPie(data); }).getCertificateSummary(); }
+    function renderPie(data) { var values = [data.valid, data.expiringSoon, data.expired, data.noDate]; var labels = ['Geçerli','60 Gün İçinde','Süresi Dolmuş','Tarih Yok']; var colors = ['#16a34a','#f59e0b','#dc2626','#94a3b8']; var total = values.reduce(function(a,b){return a+b},0) || 1; var start = 0; var parts = []; values.forEach(function (value, i) { var end = start + value / total * 360; parts.push(colors[i] + ' ' + start + 'deg ' + end + 'deg'); start = end; }); document.getElementById('pie').style.background = 'conic-gradient(' + parts.join(',') + ')'; document.getElementById('legend').innerHTML = labels.map(function(label,i){return '<span><i style="background:'+colors[i]+'"></i>'+label+' ('+values[i]+')</span>'}).join(''); }
+    function loadCertificates() { var filters = { query: document.getElementById('query').value, certificateType: document.getElementById('type').value, status: document.getElementById('status').value, expiringSoon: document.getElementById('soonOnly').checked }; google.script.run.withSuccessHandler(renderTable).getCertificates(filters); }
+    function clearFilters() { document.getElementById('query').value=''; document.getElementById('type').value=''; document.getElementById('status').value=''; document.getElementById('soonOnly').checked=false; loadCertificates(); }
+    function renderTable(rows) { document.getElementById('count').textContent = rows.length + ' kayıt'; if (!rows.length) { document.getElementById('table').innerHTML='<p class="muted">Kayıt bulunamadı.</p>'; return; } document.getElementById('table').innerHTML='<div class="table-scroll"><table class="data-table"><thead><tr><th>Mastar</th><th>Sertifika</th><th>Tür</th><th>Kurum</th><th>Sertifika tarihi</th><th>Geçerlilik</th><th>Kalan</th><th>Durum</th></tr></thead><tbody>'+rows.map(function(row){var cls=row.SertifikaDurumu==='Süresi Dolmuş'?'danger':row.SertifikaDurumu==='60 Gün İçinde'?'warning':'valid';return '<tr><td><strong>'+safe(row.MastarNo)+'</strong></td><td>'+safe(row.SertifikaNo)+'</td><td>'+safe(row.SertifikaTuru)+'</td><td>'+safe(row.Kurum)+'</td><td>'+safe(row.SertifikaTarihi)+'</td><td>'+safe(row.GecerlilikTarihi)+'</td><td>'+(row.KalanGun===null?'-':row.KalanGun+' gün')+'</td><td><span class="status-badge '+cls+'">'+safe(row.SertifikaDurumu)+'</span></td></tr>';}).join('')+'</tbody></table></div>'; }
+    function safe(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  </script>
+</body>
+</html>

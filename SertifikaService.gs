@@ -1,13 +1,9 @@
-const CERTIFICATE_HEADERS = [
-  'SertifikaId', 'MastarNo', 'SertifikaNo', 'SertifikaTuru', 'Kurum',
-  'SertifikaTarihi', 'GecerlilikTarihi', 'DosyaUrl', 'Durum', 'Aciklama',
-  'Aktif', 'Ekleyen', 'GuncellenmeTarihi'
-];
+const CERTIFICATE_DAYS_WARNING = 60;
 
 function getCertificatesSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Sertifikalar');
-  if (!sheet) sheet = ss.insertSheet('Sertifikalar');
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(APP_CONFIG.sheets.certificates);
+  if (!sheet) sheet = ss.insertSheet(APP_CONFIG.sheets.certificates);
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, CERTIFICATE_HEADERS.length).setValues([CERTIFICATE_HEADERS]);
     sheet.setFrozenRows(1);
@@ -15,75 +11,75 @@ function getCertificatesSheet_() {
   return sheet;
 }
 
-function getCertificateStatus_(validityDate) {
-  if (!validityDate) return 'Tarih Yok';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiry = new Date(validityDate);
-  expiry.setHours(0, 0, 0, 0);
-  const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
+function dateOnly_(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? new Date(value) : new Date(String(value) + 'T00:00:00');
+  if (isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function certificateStatus_(value) {
+  const expiry = dateOnly_(value);
+  if (!expiry) return 'Tarih Yok';
+  const today = dateOnly_(new Date());
+  const days = Math.ceil((expiry - today) / 86400000);
   if (days < 0) return 'Süresi Dolmuş';
-  if (days <= 60) return '60 Gün İçinde';
+  if (days <= CERTIFICATE_DAYS_WARNING) return '60 Gün İçinde';
   return 'Geçerli';
 }
 
-function formatCertificate_(certificate) {
-  const copy = Object.assign({}, certificate);
-  ['SertifikaTarihi', 'GecerlilikTarihi', 'GuncellenmeTarihi'].forEach((key) => {
-    if (copy[key] instanceof Date) {
-      copy[key] = Utilities.formatDate(copy[key], Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    }
+function formatDate_(value) {
+  const date = dateOnly_(value);
+  return date ? Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
+}
+
+function certificateRows_() {
+  return getSheetObjects_(APP_CONFIG.sheets.certificates).filter((row) => isActive_(row.Aktif)).map((row) => {
+    const expiry = dateOnly_(row.GecerlilikTarihi);
+    const days = expiry ? Math.ceil((expiry - dateOnly_(new Date())) / 86400000) : null;
+    return Object.assign({}, row, {
+      SertifikaDurumu: certificateStatus_(expiry),
+      KalanGun: days,
+      SertifikaTarihi: formatDate_(row.SertifikaTarihi),
+      GecerlilikTarihi: formatDate_(row.GecerlilikTarihi),
+      GuncellenmeTarihi: formatDate_(row.GuncellenmeTarihi)
+    });
   });
-  if (copy.GecerlilikTarihi) copy.SertifikaDurumu = getCertificateStatus_(copy.GecerlilikTarihi);
-  return copy;
 }
 
 function getCertificates(filters) {
   const options = filters || {};
-  const rows = getSheetObjectsFromSheet_(getCertificatesSheet_());
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const query = normalize_(options.query);
+  return certificateRows_()
+    .filter((row) => !query || [row.MastarNo, row.SertifikaNo, row.SertifikaTuru, row.Kurum].some((value) => normalize_(value).includes(query)))
+    .filter((row) => !options.mastarNo || normalize_(row.MastarNo).includes(normalize_(options.mastarNo)))
+    .filter((row) => !options.certificateType || row.SertifikaTuru === options.certificateType)
+    .filter((row) => !options.status || row.SertifikaDurumu === options.status)
+    .filter((row) => options.expiringSoon !== true || (row.KalanGun !== null && row.KalanGun >= 0 && row.KalanGun <= CERTIFICATE_DAYS_WARNING))
+    .sort((a, b) => (a.KalanGun === null ? 99999 : a.KalanGun) - (b.KalanGun === null ? 99999 : b.KalanGun));
+}
 
-  return rows
-    .filter((row) => String(row.Aktif).toLowerCase() !== 'false')
-    .map((row) => {
-      const item = Object.assign({}, row);
-      item.SertifikaDurumu = getCertificateStatus_(item.GecerlilikTarihi);
-      if (item.GecerlilikTarihi) {
-        const expiry = new Date(item.GecerlilikTarihi);
-        expiry.setHours(0, 0, 0, 0);
-        item.KalanGun = Math.ceil((expiry - today) / 86400000);
-      } else {
-        item.KalanGun = null;
-      }
-      return item;
-    })
-    .filter((item) => !options.mastarNo || String(item.MastarNo).toLowerCase().includes(String(options.mastarNo).toLowerCase()))
-    .filter((item) => !options.certificateType || item.SertifikaTuru === options.certificateType)
-    .filter((item) => !options.status || item.SertifikaDurumu === options.status)
-    .filter((item) => options.expiringSoon !== true || (item.KalanGun !== null && item.KalanGun >= 0 && item.KalanGun <= 60))
-    .sort((a, b) => {
-      if (a.KalanGun === null) return 1;
-      if (b.KalanGun === null) return -1;
-      return a.KalanGun - b.KalanGun;
-    })
-    .map(formatCertificate_);
+function getCertificatesByProduct(mastarNo) {
+  return getCertificates({ mastarNo: mastarNo });
 }
 
 function getCertificateFilterOptions() {
-  const rows = getSheetObjectsFromSheet_(getCertificatesSheet_());
+  const rows = certificateRows_();
   return {
-    types: [...new Set(rows.map((row) => row.SertifikaTuru).filter(Boolean))].sort(),
+    types: [...new Set(rows.map((row) => row.SertifikaTuru).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'tr')),
     statuses: ['Geçerli', '60 Gün İçinde', 'Süresi Dolmuş', 'Tarih Yok']
   };
 }
 
 function getCertificateSummary() {
-  const rows = getCertificates({});
+  const rows = certificateRows_();
   return {
     total: rows.length,
+    valid: rows.filter((row) => row.SertifikaDurumu === 'Geçerli').length,
     expiringSoon: rows.filter((row) => row.SertifikaDurumu === '60 Gün İçinde').length,
-    expired: rows.filter((row) => row.SertifikaDurumu === 'Süresi Dolmuş').length
+    expired: rows.filter((row) => row.SertifikaDurumu === 'Süresi Dolmuş').length,
+    noDate: rows.filter((row) => row.SertifikaDurumu === 'Tarih Yok').length
   };
 }
 
@@ -92,32 +88,16 @@ function saveCertificate(data) {
   if (!input.mastarNo || !input.certificateType || !input.validityDate) {
     throw new Error('Mastar no, sertifika türü ve geçerlilik tarihi zorunludur.');
   }
-
   const user = getCurrentUser_({ parameter: { userEmail: input.userEmail || '', userName: input.userName || '' } });
-  if (!user.active || !['admin', 'operator'].includes(user.role)) {
-    throw new Error('Sertifika kaydı için yetkiniz bulunmuyor.');
-  }
+  if (!user.active || !['admin', 'operator'].includes(user.role)) throw new Error('Sertifika kaydı için yetkiniz bulunmuyor.');
   if (!getProductByNo(input.mastarNo)) throw new Error('Mastar bulunamadı.');
 
   const now = new Date();
-  const sheet = getCertificatesSheet_();
   const row = [
-    Utilities.getUuid(), input.mastarNo, input.certificateNo || '', input.certificateType,
-    input.organization || '', input.certificateDate ? new Date(input.certificateDate) : '',
-    new Date(input.validityDate), input.fileUrl || '', getCertificateStatus_(new Date(input.validityDate)),
-    input.description || '', true, user.name, now
+    'S-' + Utilities.getUuid().slice(0, 8), input.mastarNo, input.certificateNo || '', input.certificateType,
+    input.organization || '', input.certificateDate ? dateOnly_(input.certificateDate) : '', dateOnly_(input.validityDate),
+    input.fileUrl || '', certificateStatus_(input.validityDate), input.description || '', true, user.name, now
   ];
-  sheet.appendRow(row);
-  return formatCertificate_(Object.fromEntries(CERTIFICATE_HEADERS.map((header, index) => [header, row[index]])));
-}
-
-function getSheetObjectsFromSheet_(sheet) {
-  if (!sheet || sheet.getLastRow() < 2) return [];
-  const values = sheet.getDataRange().getValues();
-  const headers = values[0];
-  return values.slice(1).map((row) => {
-    const item = {};
-    headers.forEach((header, index) => item[header] = row[index]);
-    return item;
-  });
+  getCertificatesSheet_().appendRow(row);
+  return { success: true };
 }
