@@ -1,14 +1,17 @@
 <header class="app-header">
   <a class="brand" href="?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
-  <nav><a class="button button-secondary" href="?page=Index">Hızlı işlem</a><a class="button button-secondary" href="?page=MasterTakip">Liste</a><a class="button button-secondary" href="?page=Index">Kalibrasyon</a></nav>
-  <div class="user-area"><span id="headerUserName" class="user-name"></span> <span id="headerUserRole"></span></div>
+  <nav>
+    <a class="button button-secondary" href="?page=Index">Hızlı işlem</a>
+    <a class="button button-secondary" href="?page=MasterTakip">Liste</a>
+    <a class="button button-secondary" href="?page=Sertifikalar">Kalibrasyon</a>
+    <a class="button button-secondary" href="?page=Raporlar">İstatistik</a>
+  </nav>
+  <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
 </header>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const context = window.APP_CONTEXT || {};
-    const nameEl = document.getElementById('headerUserName');
-    const roleEl = document.getElementById('headerUserRole');
-    if (nameEl) nameEl.textContent = context.name || 'Kullanıcı';
-    if (roleEl) roleEl.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
-  });
+document.addEventListener('DOMContentLoaded', function () {
+  const context = window.APP_CONTEXT || {};
+  document.getElementById('headerUserName').textContent = context.name || 'Kullanıcı';
+  document.getElementById('headerUserRole').textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
+});
 </script>
