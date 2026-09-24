@@ -9,21 +9,13 @@
 <body>
   <?!= include('Header'); ?>
   <main class="page-shell">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">MASTAR YÖNETİMİ</p>
-        <h1>Hızlı işlem merkezi</h1>
-        <p class="muted">Mastarı kodu veya adıyla ara, seç ve işlemi kaydet.</p>
-      </div>
-    </section>
-
     <section class="panel quick-search">
       <div class="search-line">
-        <input id="globalSearch" autofocus placeholder="Mastar adı veya kodu · örn: g8 tampon mastar" autocomplete="off">
+        <input id="globalSearch" autofocus placeholder="Mastar kodu veya ürün adı" autocomplete="off">
         <label class="check-box"><input id="includeAll" type="checkbox"> Pasifler dahil</label>
-        <button id="searchButton" class="button button-primary" type="button">Bul</button>
+        <button id="searchButton" class="button button-primary" type="button">Ara</button>
       </div>
-      <p id="searchHint" class="muted">Yakın isim ve kod eşleşmeleri gösterilir.</p>
+      <p id="searchHint" class="muted">Ürün kodu, isim, seri no ve konuma göre arama yapın.</p>
     </section>
 
     <div class="workspace">
@@ -31,7 +23,10 @@
         <div class="section-head"><h2>Sonuçlar</h2><span id="resultCount" class="muted"></span></div>
         <div id="resultsPane"><p class="muted">Arama yapın.</p></div>
       </aside>
-      <section id="detailPane" class="detail-panel panel hidden"><div id="detailContent"></div></section>
+
+      <section id="detailPane" class="detail-panel panel hidden">
+        <div id="detailContent"></div>
+      </section>
     </div>
   </main>
 
@@ -40,7 +35,7 @@
     let searchRows = [];
     let selectedProduct = null;
     const $ = (id) => document.getElementById(id);
-    const reasons = {
+    const defaultReasons = {
       Al: ['Ölçüm için kullanım', 'Kullanım sırasında gerekli', 'Ölçüm ve kontrol'],
       'Geri Koy': ['Depoya geri iade', 'Kullanım sonrası iade', 'Kayıt altına alınan dönüş'],
       Transfer: ['Transfer / konum değişimi', 'İşlem alanı değişimi', 'Uygulama yeri taşıma'],
@@ -52,16 +47,19 @@
 
     function search() {
       const query = $('globalSearch').value.trim();
-      if (!query) { $('searchHint').textContent = 'Bir mastar adı veya kodu yazın.'; return; }
+      if (!query) {
+        $('searchHint').textContent = 'Arama için bir ürün kodu veya isim yazın.';
+        return;
+      }
       google.script.run.withSuccessHandler(renderResults).withFailureHandler(showSearchError)
         .searchProducts(query, { includeAll: $('includeAll').checked });
     }
 
     function renderResults(rows) {
       searchRows = rows || [];
-      $('resultCount').textContent = searchRows.length + ' sonuç';
+      $('resultCount').textContent = searchRows.length + ' ürün';
       if (!searchRows.length) {
-        $('resultsPane').innerHTML = '<p class="muted">Kayıt bulunamadı. Pasifleri dahil etmeyi deneyin.</p>';
+        $('resultsPane').innerHTML = '<p class="muted">Kayıt bulunamadı.</p>';
         return;
       }
       $('resultsPane').innerHTML = searchRows.map((row, index) =>
@@ -69,26 +67,34 @@
         '<span class="code">' + safe(row.MastarNo) + '</span>' +
         '<strong>' + safe(row.UrunAdi) + '</strong>' +
         '<small>' + safe(row.SeriNo) + ' · ' + safe(row.AnaKonum) + ' / ' + safe(row.DetayKonum) + '</small>' +
-        '<em>' + safe(row.Durum) + '</em></button>'
+        '<em>' + safe(row.Durum || 'Bilinmiyor') + '</em>' +
+        '</button>'
       ).join('');
     }
 
     function selectProduct(index) {
       selectedProduct = searchRows[index];
-      renderProduct();
-      loadProductCertificates(selectedProduct.MastarNo);
+      google.script.run.withSuccessHandler((detail) => {
+        renderProduct(detail);
+      }).withFailureHandler((error) => {
+        $('detailContent').innerHTML = '<p class="form-message error">' + safe(error.message || 'Ürün detayları yüklenemedi.') + '</p>';
+      }).getProductDetail(selectedProduct.MastarNo);
     }
 
-    function renderProduct() {
-      const product = selectedProduct;
+    function renderProduct(detail) {
+      const product = (detail && detail.product) ? detail.product : selectedProduct;
+      const certificates = detail && detail.certificates ? detail.certificates : [];
+      const history = detail && detail.history ? detail.history : [];
       $('detailPane').classList.remove('hidden');
       $('detailContent').innerHTML =
-        '<div class="section-head"><div><p class="eyebrow">SEÇİLEN DEMİRBAŞ</p><h2>' + safe(product.UrunAdi) + '</h2><span class="muted">' + safe(product.MastarNo) + ' · ' + safe(product.SeriNo) + '</span></div><span class="status-badge">' + safe(product.Durum) + '</span></div>' +
+        '<div class="section-head"><div><p class="eyebrow">SEÇİLEN ÜRÜN</p><h2>' + safe(product.UrunAdi || '-') + '</h2><span class="muted">' + safe(product.MastarNo) + '</span></div></div>' +
         '<div class="info-grid">' +
-          '<div class="info-box"><span>Ana konum</span><strong>' + safe(product.AnaKonum) + '</strong></div>' +
-          '<div class="info-box"><span>Detay / kimde</span><strong>' + safe(product.DetayKonum) + '</strong></div>' +
-          '<div class="info-box"><span>Sorumlu</span><strong>' + safe(product.SorumluKisi || 'Belirtilmemiş') + '</strong></div>' +
-          '<div class="info-box"><span>Açıklama</span><strong>' + safe(product.Aciklama || '-') + '</strong></div>' +
+          '<div class="info-box"><span>Seri no</span><strong>' + safe(product.SeriNo || '-') + '</strong></div>' +
+          '<div class="info-box"><span>Konum</span><strong>' + safe(product.AnaKonum || 'Depo') + ' / ' + safe(product.DetayKonum || '-') + '</strong></div>' +
+          '<div class="info-box"><span>Durum</span><strong>' + safe(product.Durum || 'Bilinmiyor') + '</strong></div>' +
+          '<div class="info-box"><span>Sorumlu kişi</span><strong>' + safe(product.SorumluKisi || 'Belirtilmemiş') + '</strong></div>' +
+          '<div class="info-box"><span>Son kontrol</span><strong>' + safe(product.SonKontrolTarihi || '-') + '</strong></div>' +
+          '<div class="info-box"><span>Sonraki kontrol</span><strong>' + safe(product.SonrakiKontrolTarihi || '-') + '</strong></div>' +
         '</div>' +
         '<div class="action-bar">' +
           '<button class="button button-primary" type="button" onclick="setAction(\'Al\')">Üzerime Al</button>' +
@@ -96,35 +102,37 @@
           '<button class="button button-secondary" type="button" onclick="setAction(\'Transfer\')">Transfer</button>' +
         '</div>' +
         '<div id="actionForm"></div>' +
-        '<div class="certificate-box"><div class="section-head"><h3>Kalibrasyon / sertifikalar</h3><span id="certificateCount" class="muted">Yükleniyor...</span></div><div id="productCertificates"><p class="muted">Yükleniyor...</p></div></div>' +
-        '<div class="history-box"><h3>Son hareketler</h3><div id="historyList"><p class="muted">Yükleniyor...</p></div></div>';
+        '<div class="certificate-box"><div class="section-head"><h3>Kalibrasyon / sertifikalar</h3><span id="certificateCount" class="muted">' + certificates.length + ' kayıt</span></div><div id="productCertificates"></div></div>' +
+        '<div class="history-box"><h3>Son hareketler</h3><div id="historyList"></div></div>';
       setAction('Al');
-      loadHistory(product.MastarNo);
+      renderCertificates(certificates);
+      renderHistory(history);
     }
 
     function setAction(type) {
-      const options = (reasons[type] || reasons.Al).map((reason) => '<option value="' + safeAttr(reason) + '">' + safe(reason) + '</option>').join('');
+      const options = (defaultReasons[type] || defaultReasons.Al).map((reason) => '<option value="' + safeAttr(reason) + '">' + safe(reason) + '</option>').join('');
       $('actionForm').innerHTML =
         '<div class="form-grid">' +
-          '<label class="field">İşlem<select id="movementType"><option value="' + safeAttr(type) + '">' + safe(type) + '</option><option>Al</option><option>Geri Koy</option><option>Transfer</option><option>Kontrol</option></select></label>' +
-          '<label class="field">Yeni ana konum<input id="mainLocation" value="' + safeAttr(selectedProduct.AnaKonum) + '"></label>' +
-          '<label class="field">Detay / kimde<input id="detailLocation" value="' + safeAttr(selectedProduct.DetayKonum) + '" placeholder="Kişi, raf, dolap, saha..."></label>' +
-          '<label class="field">Hazır neden<select id="reasonPreset"><option value="">Boş bırakılırsa otomatik neden</option>' + options + '</select></label>' +
+          '<label class="field">İşlem<select id="movementType"><option value="' + safeAttr(type) + '">' + safe(type) + '</option><option>Al</option><option>Geri Koy</option><option>Transfer</option></select></label>' +
+          '<label class="field">Yeni ana konum<input id="mainLocation" value="' + safeAttr(selectedProduct.AnaKonum || 'Depo') + '"></label>' +
+          '<label class="field">Detay / kimde<input id="detailLocation" value="' + safeAttr(selectedProduct.DetayKonum || '') + '" placeholder="Kişi, raf, dolap, saha..."></label>' +
+          '<label class="field">Atanacak kullanıcı<input id="assignedTo" value="' + safeAttr(selectedProduct.SorumluKisi || '') + '" placeholder="Kullanıcı adı"></label>' +
+          '<label class="field">Hazır neden<select id="reasonPreset"><option value="">Otomatik neden</option>' + options + '</select></label>' +
         '</div>' +
         '<div class="save-row"><button class="button button-primary" type="button" onclick="saveMovement()">İşlemi kaydet</button></div>' +
         '<p id="actionMessage" class="form-message"></p>';
     }
 
     function saveMovement() {
-      const type = $('movementType').value;
       const payload = {
         mastarNo: selectedProduct.MastarNo,
-        movementType: type,
+        movementType: $('movementType').value,
         newMainLocation: $('mainLocation').value,
         newDetailLocation: $('detailLocation').value,
         newStatus: selectedProduct.Durum,
         description: $('reasonPreset').value,
         reasonPreset: $('reasonPreset').value,
+        assignedTo: $('assignedTo').value,
         userEmail: window.APP_CONTEXT.email,
         userName: window.APP_CONTEXT.name,
         source: 'HizliIslem'
@@ -132,31 +140,52 @@
       google.script.run.withSuccessHandler(() => {
         showAction('İşlem kaydedildi.', 'success');
         search();
-        loadHistory(selectedProduct.MastarNo);
+        selectProduct(searchRows.findIndex((row) => row.MastarNo === selectedProduct.MastarNo));
       }).withFailureHandler((error) => showAction(error.message || 'Kayıt başarısız.', 'error')).saveMovement(payload);
     }
 
-    function loadProductCertificates(mastarNo) {
-      google.script.run.withSuccessHandler((rows) => {
-        $('certificateCount').textContent = rows.length + ' kayıt';
-        if (!rows.length) { $('productCertificates').innerHTML = '<p class="muted">Bu demirbaş için sertifika bulunamadı.</p>'; return; }
-        $('productCertificates').innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Tür</th><th>Sertifika no</th><th>Geçerlilik</th><th>Kalan</th><th>Durum</th></tr></thead><tbody>' + rows.map((row) => {
+    function renderCertificates(rows) {
+      const el = $('productCertificates');
+      if (!rows.length) {
+        el.innerHTML = '<p class="muted">Bu ürün için sertifika bulunamadı.</p>';
+        return;
+      }
+      el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Tür</th><th>No</th><th>Geçerlilik</th><th>Durum</th></tr></thead><tbody>' +
+        rows.map((row) => {
           const klass = row.SertifikaDurumu === 'Süresi Dolmuş' ? 'danger' : row.SertifikaDurumu === '60 Gün İçinde' ? 'warning' : 'valid';
-          return '<tr><td>' + safe(row.SertifikaTuru) + '</td><td>' + safe(row.SertifikaNo) + '</td><td>' + safe(row.GecerlilikTarihi) + '</td><td>' + (row.KalanGun == null ? '-' : row.KalanGun + ' gün') + '</td><td><span class="status-badge ' + klass + '">' + safe(row.SertifikaDurumu) + '</span></td></tr>';
+          return '<tr><td>' + safe(row.SertifikaTuru) + '</td><td>' + safe(row.SertifikaNo) + '</td><td>' + safe(row.GecerlilikTarihi) + '</td><td class="' + klass + '">' + safe(row.SertifikaDurumu) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
-      }).withFailureHandler((error) => { $('productCertificates').innerHTML = '<p class="form-message error">' + safe(error.message) + '</p>'; }).getCertificatesByProduct(mastarNo);
     }
 
-    function loadHistory(mastarNo) {
-      google.script.run.withSuccessHandler((rows) => {
-        $('historyList').innerHTML = rows.length ? '<table class="data-table"><thead><tr><th>Tarih</th><th>İşlem</th><th>Kullanıcı</th><th>Eski → Yeni</th><th>Neden</th></tr></thead><tbody>' + rows.slice(0, 8).map((row) => '<tr><td>' + safe(row.TarihSaat) + '</td><td>' + safe(row.HareketTuru) + '</td><td>' + safe(row.KullaniciAdi) + '</td><td>' + safe(row.EskiAnaKonum) + ' → ' + safe(row.YeniAnaKonum) + '</td><td>' + safe(row.Aciklama) + '</td></tr>').join('') + '</tbody></table>' : '<p class="muted">Henüz hareket yok.</p>';
-      }).getMovementHistory(mastarNo);
+    function renderHistory(rows) {
+      const el = $('historyList');
+      if (!rows.length) {
+        el.innerHTML = '<p class="muted">Kayıt yok.</p>';
+        return;
+      }
+      el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Tarih</th><th>İşlem</th><th>Kullanıcı</th><th>Eski → Yeni</th><th>Açıklama</th></tr></thead><tbody>' + rows.map((row) => {
+        return '<tr><td>' + safe(row.TarihSaat || '-') + '</td><td>' + safe(row.HareketTuru || '-') + '</td><td>' + safe(row.KullaniciAdi || '-') + '</td><td>' + safe(row.EskiAnaKonum || '-') + ' → ' + safe(row.YeniAnaKonum || '-') + '</td><td>' + safe(row.Aciklama || '-') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
     }
 
-    function showAction(text, type) { if ($('actionMessage')) { $('actionMessage').textContent = text; $('actionMessage').className = 'form-message ' + type; } }
-    function showSearchError(error) { $('searchHint').textContent = error.message || 'Arama sırasında hata oluştu.'; }
-    function safe(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-    function safeAttr(value) { return safe(value).replace(/\n/g, ' '); }
+    function showAction(text, type) {
+      if ($('actionMessage')) {
+        $('actionMessage').textContent = text;
+        $('actionMessage').className = 'form-message ' + type;
+      }
+    }
+
+    function showSearchError(error) {
+      $('searchHint').textContent = error.message || 'Arama sırasında hata oluştu.';
+    }
+
+    function safe(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function safeAttr(value) {
+      return safe(value).replace(/\n/g, ' ');
+    }
   </script>
 </body>
 </html>
