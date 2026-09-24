@@ -1,13 +1,25 @@
+<!--
+CLAUDE UI NOTE
+Navigation must leave the current Apps Script iframe and open the web-app route
+in the top window. Without target="_top", repeated page navigation can create
+nested panels and appear frozen. Keep these routes on the deployed /exec URL.
+-->
 <header class="app-header">
-  <a class="brand" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
+  <a class="brand" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
   <nav>
-    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index">Hızlı işlem</a>
-    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=MasterTakip">Liste</a>
-    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Sertifikalar">Kalibrasyon Giriş</a>
-    <a class="button button-secondary" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Raporlar">İstatistik</a>
+    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Index">Hızlı işlem</a>
+    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=MasterTakip">Liste</a>
+    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Sertifikalar">Kalibrasyon Giriş</a>
+    <a class="button button-secondary" target="_top" href="https://script.google.com/macros/s/AKfycbwkDD9qKRxWxOpsU22BZOpmO83Y6DIZJgDswgpmJUjKUryPSriqF6No5ehqIKCtMvL-/exec?page=Raporlar">İstatistik</a>
   </nav>
   <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
 </header>
 <script>
-document.addEventListener('DOMContentLoaded', function () { var c=window.APP_CONTEXT||{}; var n=document.getElementById('headerUserName'); var r=document.getElementById('headerUserRole'); if(n)n.textContent=c.name||'Kullanıcı'; if(r)r.textContent=c.role&&c.role!=='guest'?'('+c.role+')':''; });
+(function () {
+  var context = window.APP_CONTEXT || {};
+  var name = document.getElementById('headerUserName');
+  var role = document.getElementById('headerUserRole');
+  if (name) name.textContent = context.name || 'Kullanıcı';
+  if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
+}());
 </script>
