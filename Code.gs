@@ -8,7 +8,9 @@ const APP_CONFIG = {
   },
   pages: {
     home: 'Index',
-    masterTracking: 'MasterTakip'
+    masterTracking: 'MasterTakip',
+    reports: 'Raporlar',
+    certificates: 'Sertifikalar'
   }
 };
 
@@ -41,10 +43,9 @@ const DEFAULT_REASON_MAP = {
 function doGet(e) {
   ensureSheets();
   const page = normalizePage_(e && e.parameter && e.parameter.page);
-  const user = getCurrentUser_(e);
   const template = HtmlService.createTemplateFromFile(page);
-  template.pageTitle = page === APP_CONFIG.pages.masterTracking ? 'Mastar Takip' : 'Ana Menü';
-  template.userContext = JSON.stringify(user).replace(/</g, '\\u003c');
+  template.pageTitle = page === APP_CONFIG.pages.home ? 'Ana Menü' : page;
+  template.userContext = JSON.stringify(getCurrentUser_(e)).replace(/</g, '\\u003c');
 
   return template.evaluate()
     .setTitle(APP_CONFIG.appName)
@@ -56,17 +57,13 @@ function include(filename) {
 }
 
 function normalizePage_(requestedPage) {
-  return String(requestedPage || '').toLowerCase() === 'mastertakip'
-    ? APP_CONFIG.pages.masterTracking
-    : APP_CONFIG.pages.home;
+  const requested = String(requestedPage || '').toLowerCase();
+  const pages = Object.keys(APP_CONFIG.pages).map((key) => APP_CONFIG.pages[key]);
+  return pages.find((page) => page.toLowerCase() === requested) || APP_CONFIG.pages.home;
 }
 
 function getSpreadsheet_() {
-  try {
-    return SpreadsheetApp.getActiveSpreadsheet();
-  } catch (error) {
-    return SpreadsheetApp.getActiveSpreadsheet();
-  }
+  return SpreadsheetApp.getActiveSpreadsheet();
 }
 
 function ensureSheets() {
@@ -105,18 +102,16 @@ function seedExampleUsers_(sheet) {
 }
 
 function seedExampleCertificates_(sheet) {
-  const today = new Date();
-  const addDays = (n) => {
-    const date = new Date(today);
-    date.setDate(date.getDate() + n);
-    return date;
+  const now = new Date();
+  const date = (days) => {
+    const result = new Date(now);
+    result.setDate(result.getDate() + days);
+    return result;
   };
-
-  sheet.getRange(2, 1, 4, CERTIFICATE_HEADERS.length).setValues([
-    ['S-001', 'M-1001', 'KAL-2026-001', 'Kalibrasyon', 'ABC Kalibrasyon', addDays(-10), addDays(25), 'https://example.com/1', '60 Gün İçinde', 'Yıllık kalibrasyon', true, 'Yönetici', new Date()],
-    ['S-002', 'M-1002', 'UYG-2026-023', 'Uygunluk', 'ISO Lab', addDays(4), addDays(120), 'https://example.com/2', 'Geçerli', 'Yıllık uygunluk', true, 'Yönetici', new Date()],
-    ['S-003', 'M-1003', 'KAL-2026-007', 'Kalibrasyon', 'XYZ Lab', addDays(-120), addDays(-10), 'https://example.com/3', 'Süresi Dolmuş', 'Geçerlilik bitti', true, 'Operatör', new Date()],
-    ['S-004', 'M-1004', 'TST-2026-015', 'Test', 'Laboratuvar A', addDays(-20), addDays(85), 'https://example.com/4', 'Geçerli', 'Düzenli kontrol', true, 'Operatör', new Date()]
+  sheet.getRange(2, 1, 3, CERTIFICATE_HEADERS.length).setValues([
+    ['S-001', 'M-1001', 'KAL-2026-001', 'Kalibrasyon', 'ABC Kalibrasyon', date(-10), date(25), '', '60 Gün İçinde', 'Yıllık kalibrasyon', true, 'Sistem', now],
+    ['S-002', 'M-1002', 'UYG-2026-023', 'Uygunluk', 'ISO Lab', date(-5), date(120), '', 'Geçerli', 'Yıllık uygunluk', true, 'Sistem', now],
+    ['S-003', 'M-1003', 'KAL-2026-007', 'Kalibrasyon', 'XYZ Lab', date(-120), date(-10), '', 'Süresi Dolmuş', 'Geçerlilik bitti', true, 'Sistem', now]
   ]);
 }
 
@@ -124,8 +119,8 @@ function getCurrentUser_(e) {
   const email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
   const parameterEmail = String(e && e.parameter && e.parameter.userEmail || '').trim().toLowerCase();
   const resolvedEmail = email || parameterEmail;
-  const users = getSheetObjects_(APP_CONFIG.sheets.users);
-  const record = users.find((row) => String(row.Email || '').trim().toLowerCase() === resolvedEmail);
+  const record = getSheetObjects_(APP_CONFIG.sheets.users)
+    .find((row) => String(row.Email || '').trim().toLowerCase() === resolvedEmail);
 
   return {
     name: record && record.KullaniciAdi ? record.KullaniciAdi : String(e && e.parameter && e.parameter.userName || 'Kullanıcı'),
@@ -141,7 +136,7 @@ function getCurrentUserContext() {
 }
 
 function getSheetObjects_(sheetName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = getSpreadsheet_().getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return [];
   const values = sheet.getDataRange().getValues();
   const headers = values[0];
@@ -153,13 +148,9 @@ function getSheetObjects_(sheetName) {
 }
 
 function normalize_(value) {
-  return String(value || '')
-    .toLocaleLowerCase('tr-TR')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ı/g, 'i')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+  return String(value || '').toLocaleLowerCase('tr-TR')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 function isActive_(value) {
@@ -180,12 +171,9 @@ function searchProducts(query, filters) {
   const options = filters || {};
 
   return getSheetObjects_(APP_CONFIG.sheets.products)
-    .filter((product) => isActive_(product.Aktif))
-    .filter((product) => {
-      if (!keyword) return true;
-      return [product.MastarNo, product.UrunAdi, product.SeriNo, product.Aciklama, product.AnaKonum]
-        .some((value) => normalize_(value).includes(keyword));
-    })
+    .filter((product) => options.includeAll || isActive_(product.Aktif))
+    .filter((product) => !keyword || [product.MastarNo, product.UrunAdi, product.SeriNo, product.Aciklama, product.AnaKonum]
+      .some((value) => normalize_(value).includes(keyword)))
     .filter((product) => !options.status || String(product.Durum || '') === String(options.status))
     .filter((product) => !options.location || String(product.AnaKonum || '') === String(options.location))
     .slice(0, 50)
@@ -195,19 +183,18 @@ function searchProducts(query, filters) {
 function getProductByNo(productNo) {
   return getSheetObjects_(APP_CONFIG.sheets.products)
     .map((product, index) => ({ product, rowIndex: index + 2 }))
-    .find((item) => String(item.product.MastarNo || '').trim().toLowerCase() === String(productNo || '').trim().toLowerCase()) || null;
+    .find((item) => normalize_(item.product.MastarNo) === normalize_(productNo)) || null;
 }
 
 function getMovementHistory(productNo) {
   return getSheetObjects_(APP_CONFIG.sheets.movements)
-    .filter((row) => String(row.MastarNo || '').trim().toLowerCase() === String(productNo || '').trim().toLowerCase())
+    .filter((row) => normalize_(row.MastarNo) === normalize_(productNo))
     .sort((a, b) => new Date(b.TarihSaat) - new Date(a.TarihSaat))
     .slice(0, 50);
 }
 
 function getDefaultReason_(movementType) {
-  const list = DEFAULT_REASON_MAP[String(movementType || 'Al')] || DEFAULT_REASON_MAP.Al;
-  return list[0];
+  return (DEFAULT_REASON_MAP[String(movementType || 'Al')] || DEFAULT_REASON_MAP.Al)[0];
 }
 
 function saveMovement(data) {
@@ -217,43 +204,26 @@ function saveMovement(data) {
   if (!record) throw new Error('Mastar bulunamadı.');
 
   const user = getCurrentUser_({ parameter: { userEmail: input.userEmail || '', userName: input.userName || '' } });
-  if (!user.active || !['admin', 'operator'].includes(user.role)) {
-    throw new Error('Bu işlem için yetkiniz bulunmuyor.');
-  }
+  if (!user.active || !['admin', 'operator'].includes(user.role)) throw new Error('Bu işlem için yetkiniz bulunmuyor.');
 
   const product = record.product;
   const now = new Date();
   const movementType = String(input.movementType || 'Al');
-  const typedReason = String(input.description || '').trim();
-  const presetReason = String(input.reasonPreset || '').trim();
-  const description = typedReason || presetReason || getDefaultReason_(movementType);
-  const newMainLocation = String(input.newMainLocation || product.AnaKonum || '').trim();
-  const newDetailLocation = String(input.newDetailLocation || product.DetayKonum || '').trim();
-  const newStatus = String(input.newStatus || product.Durum || '').trim();
+  const description = String(input.description || input.reasonPreset || '').trim() || getDefaultReason_(movementType);
+  const mainLocation = String(input.newMainLocation || product.AnaKonum || '').trim();
+  const detailLocation = String(input.newDetailLocation || product.DetayKonum || '').trim();
+  const status = String(input.newStatus || product.Durum || '').trim();
+  const ss = getSpreadsheet_();
 
-  const movementSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(APP_CONFIG.sheets.movements);
-  const productSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(APP_CONFIG.sheets.products);
-
-  movementSheet.appendRow([
+  ss.getSheetByName(APP_CONFIG.sheets.movements).appendRow([
     Utilities.getUuid(), now, user.email, user.name, product.MastarNo, product.UrunAdi,
-    movementType, product.AnaKonum || '', product.DetayKonum || '',
-    newMainLocation, newDetailLocation, product.Durum || '', newStatus,
-    description, String(input.source || 'MastarTakip')
+    movementType, product.AnaKonum || '', product.DetayKonum || '', mainLocation, detailLocation,
+    product.Durum || '', status, description, String(input.source || 'MastarTakip')
   ]);
+  ss.getSheetByName(APP_CONFIG.sheets.products).getRange(record.rowIndex, 5, 1, 3)
+    .setValues([[mainLocation, detailLocation, status]]);
 
-  productSheet.getRange(record.rowIndex, 5, 1, 3).setValues([[newMainLocation, newDetailLocation, newStatus]]);
-  productSheet.getRange(record.rowIndex, 13, 1, 2).setValues([[user.name, now]]);
-
-  return {
-    success: true,
-    product: formatProduct_(Object.assign({}, product, {
-      AnaKonum: newMainLocation,
-      DetayKonum: newDetailLocation,
-      Durum: newStatus,
-      Guncelleyen: user.name,
-      GuncellenmeTarihi: now
-    }))
-  };
+  return { success: true, product: Object.assign({}, product, { AnaKonum: mainLocation, DetayKonum: detailLocation, Durum: status }) };
 }
 
 function getFilterOptions() {
@@ -266,34 +236,20 @@ function getFilterOptions() {
 
 function getAnalytics() {
   const rows = getSheetObjects_(APP_CONFIG.sheets.movements);
-  const byLocation = rows.reduce((acc, row) => {
-    const key = row.YeniAnaKonum || 'Belirtilmemiş';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  const byUser = rows.reduce((acc, row) => {
-    const key = row.KullaniciAdi || 'Belirtilmemiş';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  const byProduct = rows.reduce((acc, row) => {
-    const key = row.MastarNo || 'Belirtilmemiş';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
+  const countBy = (key) => rows.reduce((result, row) => {
+    const value = row[key] || 'Belirtilmemiş';
+    result[value] = (result[value] || 0) + 1;
+    return result;
   }, {});
   return {
     totalMovements: rows.length,
-    byLocation,
-    byUser,
-    byProduct
+    byLocation: countBy('YeniAnaKonum'),
+    byUser: countBy('KullaniciAdi'),
+    byProduct: countBy('MastarNo')
   };
 }
 
 function baglantiyiTestEt() {
   ensureSheets();
   return 'Tablo bağlantısı hatasız tamamlandı.';
-}
-
-function seedExamples() {
-  ensureSheets();
 }
