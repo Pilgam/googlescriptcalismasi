@@ -1,7 +1,7 @@
 <!--
 CLAUDE UI NOTE
 Use target="_top" so Apps Script does not nest the next web-app page inside the current iframe.
-The small click handler gives immediate visual feedback and prevents duplicate navigation clicks.
+Dynamic getScriptUrl ensures navigation stays on the canonical exec endpoint.
 -->
 <header class="app-header">
   <a class="brand nav-link" target="_top" data-route="Index" href="<?= getScriptUrl() ?>?page=Index">
