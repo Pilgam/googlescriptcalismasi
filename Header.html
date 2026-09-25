@@ -4,15 +4,35 @@ Use target="_top" so Apps Script does not nest the next web-app page inside the 
 The small click handler gives immediate visual feedback and prevents duplicate navigation clicks.
 -->
 <header class="app-header">
-  <a class="brand nav-link" target="_top" data-route="Index" href="?page=Index"><span class="brand-mark">M</span><span>Mastar Takip</span></a>
+  <a class="brand nav-link" target="_top" data-route="Index" href="<?= getScriptUrl() ?>?page=Index">
+    <span class="brand-mark">M</span><span>Mastar Takip</span>
+  </a>
   <nav>
-    <a class="button button-secondary nav-link" target="_top" data-route="Index" href="?page=Index">Hızlı işlem</a>
-    <a class="button button-secondary nav-link" target="_top" data-route="MasterTakip" href="?page=MasterTakip">Liste</a>
-    <a class="button button-secondary nav-link" target="_top" data-route="Sertifikalar" href="?page=Sertifikalar">Kalibrasyon Giriş</a>
-    <a class="button button-secondary nav-link" target="_top" data-route="Raporlar" href="?page=Raporlar">İstatistik</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="Index" href="<?= getScriptUrl() ?>?page=Index">Hızlı işlem</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="MasterTakip" href="<?= getScriptUrl() ?>?page=MasterTakip">Liste</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="Sertifikalar" href="<?= getScriptUrl() ?>?page=Sertifikalar">Kalibrasyon Giriş</a>
+    <a class="button button-secondary nav-link" target="_top" data-route="Raporlar" href="<?= getScriptUrl() ?>?page=Raporlar">İstatistik</a>
   </nav>
-  <div class="user-area"><span id="headerUserName" class="user-name"></span><span id="headerUserRole"></span></div>
+  <div class="user-area">
+    <span id="headerUserName" class="user-name"></span>
+    <span id="headerUserRole"></span>
+  </div>
 </header>
 <script>
-(function(){var context=window.APP_CONTEXT||{};var name=document.getElementById('headerUserName');var role=document.getElementById('headerUserRole');if(name)name.textContent=context.name||'Kullanıcı';if(role)role.textContent=context.role&&context.role!=='guest'?'('+context.role+')':'';Array.prototype.forEach.call(document.querySelectorAll('.nav-link'),function(link){link.addEventListener('click',function(){link.classList.add('is-loading');link.setAttribute('aria-busy','true');});});}());
+(function(){
+  document.addEventListener('DOMContentLoaded', function(){
+    var context = window.APP_CONTEXT || {};
+    var name = document.getElementById('headerUserName');
+    var role = document.getElementById('headerUserRole');
+    if (name) name.textContent = context.name || 'Kullanıcı';
+    if (role) role.textContent = context.role && context.role !== 'guest' ? '(' + context.role + ')' : '';
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.nav-link'), function(link){
+    link.addEventListener('click', function(){
+      link.classList.add('is-loading');
+      link.setAttribute('aria-busy','true');
+    });
+  });
+}());
 </script>
