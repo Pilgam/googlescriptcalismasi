@@ -51,20 +51,7 @@
         $('searchHint').textContent = 'Arama için bir ürün kodu veya isim yazın.';
         return;
       }
-      $('searchButton').disabled = true;
-      $('searchButton').textContent = 'Aranıyor...';
-
-      google.script.run
-        .withSuccessHandler((rows) => {
-          $('searchButton').disabled = false;
-          $('searchButton').textContent = 'Ara';
-          renderResults(rows);
-        })
-        .withFailureHandler((err) => {
-          $('searchButton').disabled = false;
-          $('searchButton').textContent = 'Ara';
-          showSearchError(err);
-        })
+      google.script.run.withSuccessHandler(renderResults).withFailureHandler(showSearchError)
         .searchProducts(query, { includeAll: $('includeAll').checked });
     }
 
@@ -87,17 +74,11 @@
 
     function selectProduct(index) {
       selectedProduct = searchRows[index];
-      $('detailPane').classList.remove('hidden');
-      $('detailContent').innerHTML = '<p class="muted">Yükleniyor...</p>';
-
-      google.script.run
-        .withSuccessHandler((detail) => {
-          renderProduct(detail);
-        })
-        .withFailureHandler((error) => {
-          $('detailContent').innerHTML = '<p class="form-message error">' + safe(error.message || 'Ürün detayları yüklenemedi.') + '</p>';
-        })
-        .getProductDetail(selectedProduct.MastarNo);
+      google.script.run.withSuccessHandler((detail) => {
+        renderProduct(detail);
+      }).withFailureHandler((error) => {
+        $('detailContent').innerHTML = '<p class="form-message error">' + safe(error.message || 'Ürün detayları yüklenemedi.') + '</p>';
+      }).getProductDetail(selectedProduct.MastarNo);
     }
 
     function renderProduct(detail) {
@@ -138,14 +119,11 @@
           '<label class="field">Atanacak kullanıcı<input id="assignedTo" value="' + safeAttr(selectedProduct.SorumluKisi || '') + '" placeholder="Kullanıcı adı"></label>' +
           '<label class="field">Hazır neden<select id="reasonPreset"><option value="">Otomatik neden</option>' + options + '</select></label>' +
         '</div>' +
-        '<div class="save-row"><button id="btnSaveMovement" class="button button-primary" type="button" onclick="saveMovement()">İşlemi kaydet</button></div>' +
+        '<div class="save-row"><button class="button button-primary" type="button" onclick="saveMovement()">İşlemi kaydet</button></div>' +
         '<p id="actionMessage" class="form-message"></p>';
     }
 
     function saveMovement() {
-      const btn = $('btnSaveMovement');
-      if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor...'; }
-
       const payload = {
         mastarNo: selectedProduct.MastarNo,
         movementType: $('movementType').value,
@@ -159,17 +137,11 @@
         userName: window.APP_CONTEXT.name,
         source: 'HizliIslem'
       };
-
-      google.script.run
-        .withSuccessHandler(() => {
-          showAction('İşlem başarıyla kaydedildi.', 'success');
-          selectProduct(searchRows.findIndex((row) => row.MastarNo === selectedProduct.MastarNo));
-        })
-        .withFailureHandler((error) => {
-          if (btn) { btn.disabled = false; btn.textContent = 'İşlemi kaydet'; }
-          showAction(error.message || 'Kayıt başarısız.', 'error');
-        })
-        .saveMovement(payload);
+      google.script.run.withSuccessHandler(() => {
+        showAction('İşlem kaydedildi.', 'success');
+        search();
+        selectProduct(searchRows.findIndex((row) => row.MastarNo === selectedProduct.MastarNo));
+      }).withFailureHandler((error) => showAction(error.message || 'Kayıt başarısız.', 'error')).saveMovement(payload);
     }
 
     function renderCertificates(rows) {
