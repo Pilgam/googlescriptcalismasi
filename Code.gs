@@ -27,7 +27,17 @@ function doGet(e) {
   template.userContext = JSON.stringify(getCurrentUser_(e)).replace(/</g, '\\u003c');
   return template.evaluate().setTitle(APP_CONFIG.appName).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
-function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
+
+/** Web uygulamasının ana yayınlama URL'sini döndürür */
+function getScriptUrl() {
+  return ScriptApp.getService().getUrl();
+}
+
+/** HTML parçalarını şablon olarak derleyip dahil eder */
+function include(name) { 
+  return HtmlService.createTemplateFromFile(name).evaluate().getContent(); 
+}
+
 function normalizePage_(value) { const wanted = String(value || '').toLowerCase(); return Object.keys(APP_CONFIG.pages).map(k => APP_CONFIG.pages[k]).find(p => p.toLowerCase() === wanted) || APP_CONFIG.pages.home; }
 
 /** DATA ACCESS: active spreadsheet is preferred, fixed ID is the safe fallback for standalone web-app execution. */
