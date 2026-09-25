@@ -4,7 +4,14 @@
 <body>
   <?!= include('Header'); ?>
   <main class="page-shell">
-    <div class="page-toolbar"><div><p class="eyebrow">ANALİZ</p><h1>İstatistikler</h1><p class="muted">Pie chart yalnızca bu istatistik ekranında gösterilir.</p></div><a class="button button-secondary" href="?page=Index">Hızlı işlem</a></div>
+    <div class="page-toolbar">
+      <div>
+        <p class="eyebrow">ANALİZ</p>
+        <h1>İstatistikler</h1>
+        <p class="muted">Pie chart yalnızca bu istatistik ekranında gösterilir.</p>
+      </div>
+      <a class="button button-secondary" target="_top" href="<?= getScriptUrl() ?>?page=Index">Hızlı işlem</a>
+    </div>
     <section class="stat-grid"><div class="stat-card"><strong id="totalMovements">-</strong><span>toplam hareket</span></div><div class="stat-card"><strong id="distinctLocations">-</strong><span>konum sayısı</span></div><div class="stat-card"><strong id="distinctUsers">-</strong><span>işlem yapan kişi</span></div></section>
     <section class="analytics-grid">
       <div class="panel"><h2>Kalibrasyon durumu</h2><div class="pie-layout"><div id="certificatePie" class="pie-chart"></div><div id="certificateLegend" class="chart-legend"></div></div></div>
