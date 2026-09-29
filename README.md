@@ -1,4 +1,4 @@
-https://script.google.com/macros/s/AKfycbxF8jqg89dYSeabrumo6VZZrEUCuYb1Nkv9sn9UP2Ecsla6_vZVzEt9DC5c-75UGNKg/exec
+[https://script.google.com/macros/s/AKfycbxF8jqg89dYSeabrumo6VZZrEUCuYb1Nkv9sn9UP2Ecsla6_vZVzEt9DC5c-75UGNKg/exec](https://script.google.com/macros/s/AKfycbxF8jqg89dYSeabrumo6VZZrEUCuYb1Nkv9sn9UP2Ecsla6_vZVzEt9DC5c-75UGNKg/exec)
 linkte son hali denemeye açık şekilde duruyor birkaç ui geliştirmesi ve değişikleri olacak
 
 # CLAUDE_CONTEXT
