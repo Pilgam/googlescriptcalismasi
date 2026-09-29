@@ -99,11 +99,21 @@ function getProductDetail(no) { const product=getProductByNo(no); if (!product) 
 
 /** MOVEMENT API: records actor and assignee separately and updates the current product state. */
 function saveMovement(data) {
-  const input=data||{}, product=getProductByNo(input.mastarNo); if (!product) throw new Error('Mastar bulunamadı.');
+  const input=data||{}, initialProduct=getProductByNo(input.mastarNo); if (!initialProduct) throw new Error('Mastar bulunamadı.');
   const user=getCurrentUser_({parameter:{userEmail:input.userEmail||'',userName:input.userName||''}}); if (!user.active || !['admin','operator','teknisyen','technician'].includes(role_(user))) throw new Error('Bu işlem için yetkiniz bulunmuyor.');
-  const actor=user.name||'Kullanıcı', assigned=String(input.assignedTo||actor).trim(), main=String(input.newMainLocation||product.AnaKonum||'Depo').trim(), detail=String(input.newDetailLocation||product.DetayKonum||'').trim(), status=String(input.newStatus||product.Durum||'').trim(), type=String(input.movementType||'Al'), reason=String(input.description||input.reasonPreset||'').trim()||type;
-  getSpreadsheet_().getSheetByName(APP_CONFIG.sheets.movements).appendRow([Utilities.getUuid(),new Date(),user.email,actor,product.MastarNo,product.UrunAdi,type,product.AnaKonum||'',product.DetayKonum||'',main,detail,product.Durum||'',status,reason+' | '+(assigned!==actor?'Atayan: '+actor+' | Atanan: '+assigned:'İşlem yapan: '+actor),String(input.source||'MastarTakip')]);
-  const sheet=getSpreadsheet_().getSheetByName(APP_CONFIG.sheets.products); sheet.getRange(product._row,5,1,3).setValues([[main,detail,status]]); sheet.getRange(product._row,8).setValue(assigned); return {success:true};
+  const lock=LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    // CLAUDE CONCURRENCY NOTE: product is re-read here, inside the lock, so two people acting on the same
+    // mastar at nearly the same moment can never overwrite each other's location/status silently.
+    const product=getProductByNo(input.mastarNo); if (!product) throw new Error('Mastar bulunamadı.');
+    const actor=user.name||'Kullanıcı', assigned=String(input.assignedTo||actor).trim(), main=String(input.newMainLocation||product.AnaKonum||'Depo').trim(), detail=String(input.newDetailLocation||product.DetayKonum||'').trim(), status=String(input.newStatus||product.Durum||'').trim(), type=String(input.movementType||'Al'), reason=String(input.description||input.reasonPreset||'').trim()||type;
+    getSpreadsheet_().getSheetByName(APP_CONFIG.sheets.movements).appendRow([Utilities.getUuid(),new Date(),user.email,actor,product.MastarNo,product.UrunAdi,type,product.AnaKonum||'',product.DetayKonum||'',main,detail,product.Durum||'',status,reason+' | '+(assigned!==actor?'Atayan: '+actor+' | Atanan: '+assigned:'İşlem yapan: '+actor),String(input.source||'MastarTakip')]);
+    const sheet=getSpreadsheet_().getSheetByName(APP_CONFIG.sheets.products); sheet.getRange(product._row,5,1,3).setValues([[main,detail,status]]); sheet.getRange(product._row,8).setValue(assigned);
+  } finally {
+    lock.releaseLock();
+  }
+  return {success:true};
 }
 
 /** CERTIFICATE API: low-level certificate writing remains separate from acceptance workflow. */
@@ -114,6 +124,8 @@ function saveCalibrationWithAcceptance(data) { const input=data||{}; if (!input.
 function getQualityUsers() { return getSheetObjects_(APP_CONFIG.sheets.users).filter(r => isActive_(r.Aktif) && ['admin','kalite','quality'].includes(String(r.Rol||'').toLowerCase())).map(r=>({name:r.KullaniciAdi,email:r.Email,role:r.Rol})); }
 
 function getCertificateSummary() { const rows=certificateRows_(); return {total:rows.length,valid:rows.filter(r=>r.SertifikaDurumu==='Geçerli').length,expiringSoon:rows.filter(r=>r.SertifikaDurumu==='60 Gün İçinde').length,expired:rows.filter(r=>r.SertifikaDurumu==='Süresi Dolmuş').length,noDate:rows.filter(r=>r.SertifikaDurumu==='Tarih Yok').length}; }
+/* CLAUDE NOTE: README REQUIRED_FUNCTIONS lists this; it used to live only in the deleted SertifikaService.gs. */
+function getCertificateFilterOptions() { const rows=certificateRows_(); return {types:[...new Set(rows.map(r=>r.SertifikaTuru).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'tr')),statuses:['Geçerli','60 Gün İçinde','Süresi Dolmuş','Tarih Yok']}; }
 function getFilterOptions() { const rows=getSheetObjects_(APP_CONFIG.sheets.products); return {statuses:[...new Set(rows.map(r=>r.Durum).filter(Boolean))].sort(),locations:[...new Set(rows.map(r=>r.AnaKonum).filter(Boolean))].sort()}; }
 function getAnalytics() { const rows=getSheetObjects_(APP_CONFIG.sheets.movements), count=k=>rows.reduce((o,r)=>{const v=String(r[k]||'Belirtilmemiş');o[v]=(o[v]||0)+1;return o;},{}); return {totalMovements:rows.length,byMovement:count('HareketTuru'),byLocation:count('YeniAnaKonum'),byUser:count('KullaniciAdi'),byProduct:count('MastarNo')}; }
 function getCalibrationEntryData(no) { const detail=getProductDetail(no); if (!detail) throw new Error('Mastar bulunamadı.'); return {product:detail.product,lastCalibration:(detail.certificates||[]).find(r=>String(r.SertifikaTuru||'').toLowerCase()==='kalibrasyon')||null,certificates:detail.certificates,currentUser:getCurrentUserContext()}; }

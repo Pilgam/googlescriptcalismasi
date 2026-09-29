@@ -83,6 +83,7 @@
 
     function renderProduct(detail) {
       const product = (detail && detail.product) ? detail.product : selectedProduct;
+      selectedProduct = product; // CLAUDE FIX: keep selectedProduct in sync with the server, not just the last search snapshot.
       const certificates = detail && detail.certificates ? detail.certificates : [];
       const history = detail && detail.history ? detail.history : [];
       $('detailPane').classList.remove('hidden');
